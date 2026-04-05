@@ -1,0 +1,30 @@
+name: "Struktur-Änderungen"
+description: "UI-Elemente mit geändertem Typ und Hierarchie. Button wird FAB, Liste wird zu Cards."
+appVersion: "v2"
+difficulty: MEDIUM
+
+scenarios:
+  - feature: "self_healing.feature"
+    scenario: "Einfache ID-Änderung wird geheilt"
+    expectedHealings: 7
+    maxHealingTimeMs: 30000
+    brokenLocators:
+      - original: "btn_search"
+        expected: "fab_search"
+        type: WIDGET_TYPE_CHANGE
+        description: "Button → FloatingActionButton"
+      - original: "connection_item"
+        expected: "journey_card"
+        type: STRUCTURE_CHANGE
+        description: "Simple list item → Card with Row layout"
+      - original: "text_price"
+        expected: "label_fare"
+        type: WIDGET_TYPE_CHANGE
+        description: "Text → Badge"
+
+metrics:
+  - healing_success_rate
+  - avg_healing_time_ms
+  - total_llm_tokens
+  - total_llm_cost_usd
+  - false_positive_rate

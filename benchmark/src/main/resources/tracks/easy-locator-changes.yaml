@@ -1,0 +1,32 @@
+name: "Einfache Locator-Änderungen"
+description: "Tests mit umbenannten Element-IDs (v1 → v2). Alle Elemente existieren noch, nur die IDs sind anders."
+appVersion: "v2"
+difficulty: EASY
+
+scenarios:
+  - feature: "connection_search.feature"
+    scenario: "Direkte Verbindung finden"
+    expectedHealings: 5
+    maxHealingTimeMs: 15000
+    brokenLocators:
+      - original: "input_from"
+        expected: "departure_station"
+        type: ID_RENAME
+      - original: "input_to"
+        expected: "arrival_station"
+        type: ID_RENAME
+      - original: "btn_search"
+        expected: "fab_search"
+        type: ID_RENAME
+      - original: "connection_list"
+        expected: "results_container"
+        type: ID_RENAME
+      - original: "text_from"
+        expected: "label_departure"
+        type: ID_RENAME
+
+metrics:
+  - healing_success_rate
+  - avg_healing_time_ms
+  - total_llm_tokens
+  - total_llm_cost_usd

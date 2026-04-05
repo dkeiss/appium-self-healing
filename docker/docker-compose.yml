@@ -1,0 +1,128 @@
+services:
+
+  # ─── Android Emulator with Appium built-in ────────────────────────
+  android-emulator:
+    image: budtmo/docker-android:emulator_14.0
+    privileged: true
+    ports:
+      - "6080:6080"    # noVNC — view emulator at http://localhost:6080
+      - "5555:5555"    # ADB
+      - "4723:4723"    # Appium
+    environment:
+      EMULATOR_DEVICE: "Samsung Galaxy S10"
+      WEB_VNC: "true"
+      APPIUM: "true"
+      APPIUM_PORT: "4723"
+      RELAXED_SECURITY: "true"
+    volumes:
+      - ../android-app/app/build/outputs/apk:/app/apks:ro
+    healthcheck:
+      test: ["CMD-SHELL", "adb shell getprop sys.boot_completed 2>/dev/null | grep -q '1' && wget -qO- http://localhost:4723/status > /dev/null 2>&1"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 180s
+    deploy:
+      resources:
+        limits:
+          memory: 4g
+
+  # ─── Train Connection Backend ─────────────────────────────────────
+  backend:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.backend
+    ports:
+      - "8080:8080"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:8080/api/v1/connections/all || exit 1"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  # ─── Backend port forwarder for Android emulator ───────────────────
+  # The Android app connects to 10.0.2.2:8080 (emulator's host loopback).
+  # This sidecar shares the emulator's network namespace and forwards
+  # port 8080 to the backend service so the app can reach the API.
+  backend-forwarder:
+    image: alpine/socat
+    network_mode: "service:android-emulator"
+    depends_on:
+      backend:
+        condition: service_healthy
+    command: "TCP4-LISTEN:8080,fork,reuseaddr TCP4:backend:8080"
+    restart: unless-stopped
+
+  # ─── Appium MCP Server (sidecar for healing agent) ────────────────
+  appium-mcp:
+    image: node:22-slim
+    command: >
+      sh -c "npm install -g appium-mcp@latest &&
+             appium-mcp --appium-host android-emulator --appium-port 4723"
+    depends_on:
+      android-emulator:
+        condition: service_healthy
+    profiles:
+      - mcp  # Only started when MCP enrichment is enabled
+
+  # ─── Self-Healing Test Runner ─────────────────────────────────────
+  test-runner:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.tests
+    depends_on:
+      android-emulator:
+        condition: service_healthy
+      backend:
+        condition: service_healthy
+      backend-forwarder:
+        condition: service_started
+    env_file:
+      - .env
+    environment:
+      APPIUM_URL: "http://android-emulator:4723"
+      BACKEND_URL: "http://backend:8080"
+      SPRING_PROFILES_ACTIVE: "${LLM_PROVIDER:-anthropic}"
+      APP_APK_PATH: "/app/apks/${APP_VERSION:-v1}/debug/app-${APP_VERSION:-v1}-debug.apk"
+      APP_VERSION: "${APP_VERSION:-v1}"
+    volumes:
+      - ../build/reports:/app/integration-tests/build/reports
+      - ../android-app/app/build/outputs/apk:/app/apks:ro
+
+  # ─── Benchmark Runner (runs all LLM providers) ───────────────────
+  benchmark-runner:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.tests
+    depends_on:
+      android-emulator:
+        condition: service_healthy
+      backend:
+        condition: service_healthy
+      backend-forwarder:
+        condition: service_started
+    environment:
+      APPIUM_URL: "http://android-emulator:4723"
+      BACKEND_URL: "http://backend:8080"
+      APP_APK_PATH: "/app/apks/v2/debug/app-v2-debug.apk"
+    env_file:
+      - .env
+    volumes:
+      - ../build/reports:/app/build/reports
+      - ../android-app/app/build/outputs/apk:/app/apks:ro
+    entrypoint: >
+      sh -c "
+        echo '=== LLM Benchmark: Self-Healing Comparison ==='
+        for provider in anthropic openai mistral; do
+          echo \"--- Running with $$provider ---\"
+          SPRING_PROFILES_ACTIVE=$$provider \
+          LLM_PROVIDER=$$provider \
+          ./gradlew :integration-tests:test --no-daemon \
+            -Dcucumber.filter.tags='@self-healing' \
+            2>&1 | tee /app/build/reports/benchmark-$$provider.log
+          echo \"--- $$provider complete ---\"
+        done
+        echo '=== Benchmark complete ==='
+      "
+    profiles:
+      - benchmark

@@ -1,0 +1,94 @@
+self-healing:
+  enabled: true
+  max-retries: 3
+  llm-provider: anthropic
+  source-base-path: ${user.dir}
+  triage:
+    enabled: true
+  mcp:
+    enabled: false  # Enable when appium-mcp sidecar is running
+  git-pr:
+    enabled: false  # Enable to auto-create PRs for healed locators
+    remote-name: origin
+    base-branch: main
+    branch-prefix: fix/self-healing-
+    github-token: ${GITHUB_TOKEN:}
+    github-repo-owner: ${GITHUB_REPO_OWNER:}
+    github-repo-name: ${GITHUB_REPO_NAME:}
+
+---
+# Appium MCP Server integration (when enabled)
+spring:
+  config:
+    activate:
+      on-profile: mcp
+  ai:
+    mcp:
+      client:
+        stdio:
+          connections:
+            appium-mcp:
+              command: npx
+              args:
+                - appium-mcp@latest
+
+self-healing:
+  mcp:
+    enabled: true
+
+---
+spring:
+  config:
+    activate:
+      on-profile: anthropic
+  ai:
+    anthropic:
+      api-key: ${ANTHROPIC_API_KEY:}
+      chat:
+        options:
+          model: claude-sonnet-4-6
+          temperature: 0.1
+          max-tokens: 4096
+          cache-options:
+            strategy: system-only
+
+---
+spring:
+  config:
+    activate:
+      on-profile: openai
+  ai:
+    openai:
+      api-key: ${OPENAI_API_KEY:}
+      chat:
+        options:
+          model: gpt-4.1
+          temperature: 0.1
+          max-tokens: 4096
+
+---
+spring:
+  config:
+    activate:
+      on-profile: mistral
+  ai:
+    mistralai:
+      api-key: ${MISTRAL_API_KEY:}
+      chat:
+        options:
+          model: codestral-latest
+          temperature: 0.1
+
+---
+spring:
+  config:
+    activate:
+      on-profile: local
+  ai:
+    openai:
+      base-url: http://localhost:1234/v1
+      api-key: lm-studio
+      chat:
+        options:
+          model: local-model
+          temperature: 0.1

@@ -1,0 +1,27 @@
+name: "Navigations-Änderungen"
+description: "v2 nutzt separate Screens statt Single-Page. Ergebnisse sind auf eigenem Screen mit Back-Navigation."
+appVersion: "v2"
+difficulty: HARD
+
+scenarios:
+  - feature: "self_healing.feature"
+    scenario: "Verbindungssuche mit Umstieg nach UI-Redesign"
+    expectedHealings: 9
+    maxHealingTimeMs: 60000
+    brokenLocators:
+      - original: "connection_list"
+        expected: "results_container"
+        type: NAVIGATION_CHANGE
+        description: "Results now on separate screen (navigation required)"
+      - original: "text_no_results"
+        expected: "empty_state_text"
+        type: NAVIGATION_CHANGE
+        description: "Empty state on separate results screen"
+
+metrics:
+  - healing_success_rate
+  - avg_healing_time_ms
+  - total_llm_tokens
+  - total_llm_cost_usd
+  - false_positive_rate
+  - step_healing_count

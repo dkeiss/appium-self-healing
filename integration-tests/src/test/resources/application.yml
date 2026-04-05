@@ -1,0 +1,21 @@
+appium:
+  url: ${APPIUM_URL:http://localhost:4723}
+
+app:
+  package: de.keiss.selfhealing.app
+  activity: de.keiss.selfhealing.app.MainActivity
+  apk-path: ${APP_APK_PATH:}
+
+self-healing:
+  enabled: true
+  max-retries: 3
+  llm-provider: ${LLM_PROVIDER:anthropic}
+  source-base-path: ${user.dir}/integration-tests
+  triage:
+    enabled: true
+
+spring:
+  profiles:
+    active: ${SPRING_PROFILES_ACTIVE:anthropic},selfhealing
+  config:
+    import: classpath:application-selfhealing.yml

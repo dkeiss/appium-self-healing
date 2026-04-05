@@ -1,0 +1,197 @@
+# ==========================================
+# Gradle
+# ==========================================
+.gradle/
+build/
+!gradle/wrapper/gradle-wrapper.jar
+!**/src/main/**/build/
+!**/src/test/**/build/
+gradle-app.setting
+.gradletasknamecache
+
+# ==========================================
+# Java
+# ==========================================
+*.class
+*.log
+*.ctxt
+*.jar
+*.war
+*.ear
+*.nar
+hs_err_pid*
+replay_pid*
+.mtj.tmp/
+
+# Keep Gradle wrapper JAR
+!gradle/wrapper/gradle-wrapper.jar
+
+# ==========================================
+# Spring Boot
+# ==========================================
+HELP.md
+out/
+!**/src/main/**/out/
+!**/src/test/**/out/
+application-local.properties
+application-local.yml
+application-secret.properties
+application-secret.yml
+
+# ==========================================
+# Claude Code (local settings)
+# ==========================================
+.claude/
+
+# ==========================================
+# IDE - IntelliJ IDEA
+# ==========================================
+.idea/
+*.iws
+*.iml
+*.ipr
+.idea_modules/
+atlassian-ide-plugin.xml
+com_crashlytics_export_strings.xml
+crashlytics.properties
+crashlytics-build.properties
+fabric.properties
+
+# ==========================================
+# IDE - Eclipse
+# ==========================================
+.apt_generated
+.classpath
+.factorypath
+.project
+.settings/
+.springBeans
+.sts4-cache
+.vscode/
+
+# ==========================================
+# IDE - VS Code
+# ==========================================
+.vscode/
+*.code-workspace
+.history/
+
+# ==========================================
+# IDE - NetBeans
+# ==========================================
+/nbproject/private/
+/nbbuild/
+/dist/
+/nbdist/
+/.nb-gradle/
+
+# ==========================================
+# Operating System
+# ==========================================
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+
+# ==========================================
+# Secrets & Credentials
+# ==========================================
+.env
+.env.local
+.env.*.local
+*.key
+*.pem
+*.p12
+*.jks
+*.keystore
+secrets/
+credentials/
+application-secrets.*
+
+# LLM API Keys (NEVER commit these!)
+anthropic-api-key.txt
+openai-api-key.txt
+mistral-api-key.txt
+
+# ==========================================
+# Test Reports & Output
+# ==========================================
+**/test-results/
+**/test-output/
+**/reports/
+!src/**/reports/
+**/cucumber-reports/
+**/cucumber-html-reports/
+**/surefire-reports/
+**/failsafe-reports/
+*.log
+logs/
+
+# Screenshots from failed tests
+**/screenshots/
+!**/src/**/screenshots/
+
+# ==========================================
+# Benchmark Output
+# ==========================================
+benchmark/build/reports/
+benchmark-results/
+benchmark-*.json
+
+# ==========================================
+# Appium
+# ==========================================
+appium.log
+appium-*.log
+
+# ==========================================
+# Docker
+# ==========================================
+docker/.env
+docker/*.env
+docker-compose.override.yml
+
+# ==========================================
+# Android (top-level references)
+# ==========================================
+android-app/local.properties
+android-app/.cxx/
+android-app/app/build/
+android-app/build/
+android-app/captures/
+*.apk
+*.aab
+*.aar
+*.dex
+
+# ==========================================
+# Temporary Files
+# ==========================================
+*.tmp
+*.temp
+*.bak
+*.swp
+*~
+.cache/
+
+# ==========================================
+# Node / Frontend (in case of future tooling)
+# ==========================================
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# ==========================================
+# Python (for potential scripts)
+# ==========================================
+__pycache__/
+*.py[cod]
+*$py.class
+venv/
+.venv/

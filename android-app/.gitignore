@@ -1,0 +1,106 @@
+# ==========================================
+# Android Gradle
+# ==========================================
+*.iml
+.gradle/
+build/
+/local.properties
+local.properties
+.idea/
+.DS_Store
+captures/
+.externalNativeBuild/
+.cxx/
+
+# ==========================================
+# Android Build Output
+# ==========================================
+/build
+app/build/
+app/release/
+app/debug/
+/app/release/
+/app/debug/
+**/build/
+
+# APK / AAB / AAR
+*.apk
+*.aab
+*.aar
+*.ap_
+*.dex
+
+# ==========================================
+# Android Signing Keys (NEVER commit!)
+# ==========================================
+*.jks
+*.keystore
+keystore.properties
+release-keystore.jks
+debug.keystore
+!debug.keystore.example
+
+# ==========================================
+# Android Profiling
+# ==========================================
+/profile/
+*.hprof
+
+# ==========================================
+# Android Studio Navigation
+# ==========================================
+.navigation/
+freeline.py
+freeline/
+freeline_project_description.json
+
+# ==========================================
+# Kotlin
+# ==========================================
+.kotlin/
+*.kotlin_module
+
+# ==========================================
+# Android NDK
+# ==========================================
+.externalNativeBuild
+.cxx/
+obj/
+
+# ==========================================
+# Generated Files
+# ==========================================
+bin/
+gen/
+out/
+release/
+
+# ==========================================
+# Log Files
+# ==========================================
+*.log
+
+# ==========================================
+# Proguard
+# ==========================================
+proguard/
+
+# ==========================================
+# Google Services (if used)
+# ==========================================
+google-services.json
+!google-services.json.example
+
+# ==========================================
+# Firebase (if used)
+# ==========================================
+.firebase/
+firebase-debug.log
+
+# ==========================================
+# Fastlane (if used)
+# ==========================================
+fastlane/report.xml
+fastlane/Preview.html
+fastlane/screenshots/**/*.png
+fastlane/test_output
