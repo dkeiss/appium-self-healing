@@ -95,7 +95,8 @@ public class LocatorHealer {
      * Extracts JSON from LLM response that may contain leading/trailing text or markdown fences.
      */
     private String extractJson(String raw) {
-        if (raw == null || raw.isBlank()) return "{}";
+        if (raw == null || raw.isBlank())
+            return "{}";
         // Strip markdown fences
         String cleaned = raw.replaceAll("(?s)^```(?:json)?\\s*", "").replaceAll("(?s)\\s*```$", "").trim();
         // Find the first '{' and last '}' to extract the JSON object
@@ -108,9 +109,9 @@ public class LocatorHealer {
     }
 
     /**
-     * Strip the package:id/ prefix from resource-ids. Jetpack Compose testTags set resource-ids as short names
-     * (e.g., "fab_search") without the package prefix. LLMs sometimes return the full format
-     * (e.g., "de.keiss.selfhealing.app:id/fab_search"), which fails when disableIdLocatorAutocompletion is enabled.
+     * Strip the package:id/ prefix from resource-ids. Jetpack Compose testTags set resource-ids as short names (e.g.,
+     * "fab_search") without the package prefix. LLMs sometimes return the full format (e.g.,
+     * "de.keiss.selfhealing.app:id/fab_search"), which fails when disableIdLocatorAutocompletion is enabled.
      */
     private String stripResourceIdPrefix(String value) {
         if (value != null && value.contains(":id/")) {
@@ -125,23 +126,26 @@ public class LocatorHealer {
      * Extracts and logs token usage from the ChatResponse, including Anthropic prompt cache metrics.
      * <p>
      * Spring AI wraps the native Anthropic SDK Usage object. Cache metrics (cacheCreationInputTokens,
-     * cacheReadInputTokens) are available via the native usage and are extracted using reflection
-     * since the Spring AI Usage interface does not expose them directly.
+     * cacheReadInputTokens) are available via the native usage and are extracted using reflection since the Spring AI
+     * Usage interface does not expose them directly.
      */
     private int logTokenUsage(ChatResponse chatResponse) {
         try {
             ChatResponseMetadata metadata = chatResponse.getMetadata();
-            if (metadata == null) return 0;
+            if (metadata == null)
+                return 0;
 
             Usage usage = metadata.getUsage();
-            if (usage == null) return 0;
+            if (usage == null)
+                return 0;
 
             long promptTokens = usage.getPromptTokens();
             long completionTokens = usage.getCompletionTokens();
             long totalTokens = usage.getTotalTokens();
 
             // Log basic usage
-            log.info("Token usage — prompt: {}, completion: {}, total: {}", promptTokens, completionTokens, totalTokens);
+            log.info("Token usage — prompt: {}, completion: {}, total: {}", promptTokens, completionTokens,
+                    totalTokens);
 
             // Extract Anthropic cache metrics from the native Usage object via reflection.
             // The Anthropic SDK Usage has cacheCreationInputTokens() and cacheReadInputTokens()
@@ -156,8 +160,8 @@ public class LocatorHealer {
     }
 
     /**
-     * Attempts to extract Anthropic-specific cache metrics from the Usage object.
-     * Uses reflection to access the native Anthropic SDK Usage wrapped by Spring AI.
+     * Attempts to extract Anthropic-specific cache metrics from the Usage object. Uses reflection to access the native
+     * Anthropic SDK Usage wrapped by Spring AI.
      */
     private void extractAnthropicCacheMetrics(Usage usage) {
         try {
@@ -171,15 +175,15 @@ public class LocatorHealer {
                 nativeUsage = usage;
             }
 
-            if (nativeUsage == null) return;
+            if (nativeUsage == null)
+                return;
 
             // Try to call cacheCreationInputTokens() and cacheReadInputTokens() on the native object
             Long cacheCreation = invokeOptionalLong(nativeUsage, "cacheCreationInputTokens");
             Long cacheRead = invokeOptionalLong(nativeUsage, "cacheReadInputTokens");
 
             if (cacheCreation != null || cacheRead != null) {
-                log.info("Anthropic cache — creation: {}, read: {} tokens",
-                        cacheCreation != null ? cacheCreation : 0,
+                log.info("Anthropic cache — creation: {}, read: {} tokens", cacheCreation != null ? cacheCreation : 0,
                         cacheRead != null ? cacheRead : 0);
             }
         } catch (Exception e) {

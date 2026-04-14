@@ -15,7 +15,7 @@ import java.time.Instant;
  * Orchestrates the three-stage healing pipeline:
  *
  * Stage 1: Triage — classify the failure Stage 2: Handler — delegate to specialist (LocatorHealer, StepHealer,
- * EnvironmentChecker, AppBugReporter) Stage 3: Verification — publish event and optional MCP enrichment
+ * EnvironmentChecker, AppBugReporter) Stage 3: Post-processing — cache successful heals and publish HealingEvent
  *
  * Uses PromptCache to avoid repeated LLM calls for the same broken locator.
  */
@@ -28,7 +28,6 @@ public class HealingOrchestrator {
     private final StepHealer stepHealer;
     @Getter
     private final PromptCache promptCache;
-    private final McpContextEnricher mcpEnricher;
     private final EnvironmentChecker environmentChecker;
     private final AppBugReporter bugReporter;
     private final SelfHealingProperties properties;
@@ -43,29 +42,19 @@ public class HealingOrchestrator {
             return cached;
         }
 
-        // Stage 0 (optional): MCP enrichment
-        FailureContext enrichedContext = enrichContext(context);
-
         // Stage 1: Triage
-        TriageResult triage = performTriage(enrichedContext);
+        TriageResult triage = performTriage(context);
 
         // Stage 2: Delegate to specialized handler
-        HealingResult result = delegateToHandler(triage, enrichedContext);
+        HealingResult result = delegateToHandler(triage, context);
 
         // Stage 3: Post-processing
         if (result.success()) {
             promptCache.put(cacheKey, result);
         }
-        publishHealingEvent(enrichedContext, triage, result);
+        publishHealingEvent(context, triage, result);
 
         return result;
-    }
-
-    private FailureContext enrichContext(FailureContext context) {
-        if (mcpEnricher != null && properties.mcp() != null && properties.mcp().enabled()) {
-            return mcpEnricher.enrich(context);
-        }
-        return context;
     }
 
     private TriageResult performTriage(FailureContext context) {

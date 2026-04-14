@@ -9,8 +9,6 @@ import de.keiss.selfhealing.core.prompt.LocatorPromptCreator;
 import de.keiss.selfhealing.core.prompt.StepPromptCreator;
 import de.keiss.selfhealing.core.prompt.TriagePromptCreator;
 import org.springframework.ai.chat.client.ChatClient;
-import org.springframework.ai.tool.ToolCallbackProvider;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.ApplicationEventPublisher;
@@ -64,14 +62,6 @@ public class SelfHealingAutoConfiguration {
     }
 
     @Bean
-    @ConditionalOnBean(ToolCallbackProvider.class)
-    @ConditionalOnProperty(prefix = "self-healing.mcp", name = "enabled", havingValue = "true")
-    public McpContextEnricher mcpContextEnricher(ChatClient.Builder chatClientBuilder,
-            ToolCallbackProvider mcpToolProvider) {
-        return new McpContextEnricher(chatClientBuilder.build(), mcpToolProvider);
-    }
-
-    @Bean
     @ConditionalOnProperty(prefix = "self-healing.environment-check", name = "enabled", havingValue = "true", matchIfMissing = true)
     public EnvironmentChecker environmentChecker(SelfHealingProperties properties) {
         return new EnvironmentChecker(properties.environmentCheck());
@@ -112,11 +102,10 @@ public class SelfHealingAutoConfiguration {
     public HealingOrchestrator healingOrchestrator(TriageAgent triageAgent, LocatorHealer locatorHealer,
             StepHealer stepHealer, PromptCache promptCache, SelfHealingProperties properties,
             ApplicationEventPublisher eventPublisher,
-            @SuppressWarnings("SpringJavaInjectionPointsAutowiringInspection") org.springframework.beans.factory.ObjectProvider<McpContextEnricher> mcpEnricherProvider,
             org.springframework.beans.factory.ObjectProvider<EnvironmentChecker> environmentCheckerProvider,
             org.springframework.beans.factory.ObjectProvider<AppBugReporter> bugReporterProvider) {
         return new HealingOrchestrator(triageAgent, locatorHealer, stepHealer, promptCache,
-                mcpEnricherProvider.getIfAvailable(), environmentCheckerProvider.getIfAvailable(),
-                bugReporterProvider.getIfAvailable(), properties, eventPublisher);
+                environmentCheckerProvider.getIfAvailable(), bugReporterProvider.getIfAvailable(), properties,
+                eventPublisher);
     }
 }

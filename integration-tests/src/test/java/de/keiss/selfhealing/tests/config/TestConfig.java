@@ -56,8 +56,7 @@ public class TestConfig {
     private SelfHealingAppiumDriver createSelfHealingDriver() {
         UiAutomator2Options options = new UiAutomator2Options().setDeviceName("Android Emulator")
                 .setAppPackage(appPackage).setAppActivity(appActivity).setAutomationName("UiAutomator2")
-                .setNoReset(true).setAutoGrantPermissions(true)
-                .amend("appium:disableIdLocatorAutocompletion", true);
+                .setNoReset(true).setAutoGrantPermissions(true).amend("appium:disableIdLocatorAutocompletion", true);
 
         // If an APK path is specified, install the app
         if (apkPath != null && !apkPath.isBlank()) {

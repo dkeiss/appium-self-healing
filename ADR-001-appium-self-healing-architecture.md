@@ -1,8 +1,13 @@
 # ADR-001: Appium Self-Healing Architecture
 
-**Status:** Proposed
+**Status:** Superseded by [ADR-002](ADR-002-remove-mcp-integration.md) (MCP-Schicht entfernt)
 **Date:** 2026-04-04
 **Deciders:** Daniel Keiss
+
+> **Hinweis:** Die unten beschriebene Hybrid-Architektur (Decorator + MCP) wurde
+> mit ADR-002 zugunsten eines reinen Decorator-Ansatzes vereinfacht. Alle
+> Aussagen zu `McpContextEnricher`, dem `appium/appium-mcp`-Sidecar und der
+> `spring-ai-starter-mcp-client`-Integration sind nicht mehr gültig.
 
 ## Context
 

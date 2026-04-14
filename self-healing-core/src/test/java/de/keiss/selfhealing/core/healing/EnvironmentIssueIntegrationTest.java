@@ -4,7 +4,6 @@ import de.keiss.selfhealing.core.agent.TriageAgent;
 import de.keiss.selfhealing.core.config.SelfHealingProperties;
 import de.keiss.selfhealing.core.config.SelfHealingProperties.BugReports;
 import de.keiss.selfhealing.core.config.SelfHealingProperties.EnvironmentCheck;
-import de.keiss.selfhealing.core.config.SelfHealingProperties.Mcp;
 import de.keiss.selfhealing.core.config.SelfHealingProperties.Triage;
 import de.keiss.selfhealing.core.model.FailureContext;
 import de.keiss.selfhealing.core.model.HealingEvent;
@@ -50,7 +49,7 @@ class EnvironmentIssueIntegrationTest {
     @Test
     void unreachableBackend_triggersTerminalDiagnostic_withoutCallingLocatorHealer() {
         // --- Arrange ---
-        var properties = new SelfHealingProperties(true, 3, "anthropic", null, new Triage(true), new Mcp(false),
+        var properties = new SelfHealingProperties(true, 3, "anthropic", null, new Triage(true),
                 new EnvironmentCheck(true, "http://127.0.0.1:1/health", // unreachable — OS rejects connection instantly
                         null, // no Appium probe in this test
                         500, // connect timeout — fail fast
@@ -66,8 +65,7 @@ class EnvironmentIssueIntegrationTest {
         var orchestrator = new HealingOrchestrator(triageAgent, null, // LocatorHealer — must not be invoked on this
                                                                       // path
                 null, // StepHealer — must not be invoked on this path
-                new PromptCache(), null, // McpContextEnricher disabled
-                environmentChecker, null, // AppBugReporter — must not be invoked on this path
+                new PromptCache(), environmentChecker, null, // AppBugReporter — must not be invoked on this path
                 properties, recordingPublisher);
 
         var failureContext = new FailureContext("io.appium.java_client.NoSuchElementException: no such element",
@@ -113,7 +111,7 @@ class EnvironmentIssueIntegrationTest {
         int port = server.getAddress().getPort();
 
         try {
-            var properties = new SelfHealingProperties(true, 3, "anthropic", null, new Triage(true), new Mcp(false),
+            var properties = new SelfHealingProperties(true, 3, "anthropic", null, new Triage(true),
                     new EnvironmentCheck(true, "http://127.0.0.1:" + port + "/health", // reachable
                             null, 500, 500, 50 // retry backoff — short but observable via spy
                     ), BugReports.defaults(), null // gitPr — not relevant for environment tests
@@ -124,7 +122,7 @@ class EnvironmentIssueIntegrationTest {
             var checker = new SpyEnvironmentChecker(properties.environmentCheck());
             var recordingPublisher = new RecordingEventPublisher();
 
-            var orchestrator = new HealingOrchestrator(triageAgent, null, null, new PromptCache(), null, checker, null,
+            var orchestrator = new HealingOrchestrator(triageAgent, null, null, new PromptCache(), checker, null,
                     properties, recordingPublisher);
 
             var failureContext = new FailureContext("org.openqa.selenium.TimeoutException: timed out after 10 seconds",

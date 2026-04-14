@@ -131,8 +131,8 @@ public class SelfHealingAppiumDriver {
     }
 
     /**
-     * Returns and clears all healing screenshots captured since the last call.
-     * Called by test hooks (e.g. Cucumber @After) to attach screenshots to reports.
+     * Returns and clears all healing screenshots captured since the last call. Called by test hooks (e.g.
+     * Cucumber @After) to attach screenshots to reports.
      */
     public List<HealingScreenshot> getAndClearHealingScreenshots() {
         List<HealingScreenshot> copy = List.copyOf(healingScreenshots);
@@ -141,8 +141,8 @@ public class SelfHealingAppiumDriver {
     }
 
     /**
-     * Captures a screenshot right after the highlight broadcast, so the red border
-     * is visible. Waits briefly for the Compose animation to render.
+     * Captures a screenshot right after the highlight broadcast, so the red border is visible. Waits briefly for the
+     * Compose animation to render.
      */
     private void captureHealingScreenshot(By originalLocator, By healedLocator) {
         try {
@@ -157,8 +157,8 @@ public class SelfHealingAppiumDriver {
     }
 
     /**
-     * Sends a broadcast to the Android app to visually highlight the healed element with a red
-     * border. Visible in noVNC during demos.
+     * Sends a broadcast to the Android app to visually highlight the healed element with a red border. Visible in noVNC
+     * during demos.
      */
     private void highlightHealedElement(String locatorExpression) {
         if (locatorExpression == null) {
@@ -167,8 +167,8 @@ public class SelfHealingAppiumDriver {
         try {
             // Extract the raw tag value from expressions like "accessibilityId(fab_search)"
             String tag = locatorExpression.replaceAll(".*\\((.+)\\)", "$1");
-            delegate.executeScript("mobile: shell", Map.of(
-                    "command", "am broadcast -a de.keiss.selfhealing.HIGHLIGHT --es tag " + tag));
+            delegate.executeScript("mobile: shell",
+                    Map.of("command", "am broadcast -a de.keiss.selfhealing.HIGHLIGHT --es tag " + tag));
             log.debug("Highlight broadcast sent for tag: {}", tag);
         } catch (Exception e) {
             log.debug("Could not send highlight broadcast: {}", e.getMessage());

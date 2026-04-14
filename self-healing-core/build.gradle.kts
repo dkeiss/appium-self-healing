@@ -19,4 +19,7 @@ dependencies {
     implementation("org.kohsuke:github-api:1.330")
 
     testImplementation("org.springframework.boot:spring-boot-starter-test")
+    // Spring Boot 4 / JUnit 6 no longer brings the platform launcher transitively;
+    // Gradle's test runner needs it explicitly to start the JUnit Platform.
+    testRuntimeOnly("org.junit.platform:junit-platform-launcher")
 }

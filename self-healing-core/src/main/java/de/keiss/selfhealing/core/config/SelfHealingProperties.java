@@ -4,7 +4,7 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 
 @ConfigurationProperties(prefix = "self-healing")
 public record SelfHealingProperties(boolean enabled, int maxRetries, String llmProvider, String sourceBasePath,
-        Triage triage, Mcp mcp, EnvironmentCheck environmentCheck, BugReports bugReports, GitPr gitPr) {
+        Triage triage, EnvironmentCheck environmentCheck, BugReports bugReports, GitPr gitPr) {
 
     public SelfHealingProperties {
         if (maxRetries <= 0)
@@ -13,8 +13,6 @@ public record SelfHealingProperties(boolean enabled, int maxRetries, String llmP
             llmProvider = "anthropic";
         if (triage == null)
             triage = new Triage(true);
-        if (mcp == null)
-            mcp = new Mcp(false);
         if (environmentCheck == null)
             environmentCheck = EnvironmentCheck.defaults();
         if (bugReports == null)
@@ -24,9 +22,6 @@ public record SelfHealingProperties(boolean enabled, int maxRetries, String llmP
     }
 
     public record Triage(boolean enabled) {
-    }
-
-    public record Mcp(boolean enabled) {
     }
 
     public record EnvironmentCheck(boolean enabled, String backendUrl, String appiumUrl, long connectTimeoutMs,

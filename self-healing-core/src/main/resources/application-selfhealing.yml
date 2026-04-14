@@ -5,8 +5,6 @@ self-healing:
   source-base-path: ${user.dir}
   triage:
     enabled: true
-  mcp:
-    enabled: false  # Enable when appium-mcp sidecar is running
   git-pr:
     enabled: false  # Enable to auto-create PRs for healed locators
     remote-name: origin
@@ -15,26 +13,6 @@ self-healing:
     github-token: ${GITHUB_TOKEN:}
     github-repo-owner: ${GITHUB_REPO_OWNER:}
     github-repo-name: ${GITHUB_REPO_NAME:}
-
----
-# Appium MCP Server integration (when enabled)
-spring:
-  config:
-    activate:
-      on-profile: mcp
-  ai:
-    mcp:
-      client:
-        stdio:
-          connections:
-            appium-mcp:
-              command: npx
-              args:
-                - appium-mcp@latest
-
-self-healing:
-  mcp:
-    enabled: true
 
 ---
 spring:

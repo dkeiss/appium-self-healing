@@ -53,7 +53,7 @@ services:
     command: "TCP4-LISTEN:8080,fork,reuseaddr TCP4:backend:8080"
     restart: unless-stopped
 
-  # ─── Appium MCP Server (sidecar for healing agent) ────────────────
+  # ─── Appium MCP Server (Debugging) ────────────────
   appium-mcp:
     image: node:22-slim
     command: >

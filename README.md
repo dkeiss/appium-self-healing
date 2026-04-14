@@ -15,6 +15,7 @@ Dieses Projekt demonstriert, wie **LLM-basierte Agenten** fehlschlagende Appium-
 - [Technologie-Stack](#technologie-stack)
 - [LLM-Benchmark](#llm-benchmark)
 - [Konfiguration](#konfiguration)
+- [Fix-Verifikation](#fix-verifikation-mit-verify-fixsh) — Baseline vs. Fix-Branch via `verify-fix.sh`
 - [Test-Ergebnisse](TEST-RESULTS.md) — Detaillierte Ergebnisse aller Test-Runs (v1, v2, multi-LLM, verify-fix)
 
 ---
@@ -319,6 +320,51 @@ ANTHROPIC_API_KEY=sk-ant-... \
     -Dspring.profiles.active=anthropic
 ```
 
+### Fix-Verifikation mit `verify-fix.sh`
+
+Wenn ein Fix-Branch (z.B. aus einer Auto-Fix-PR oder manuelle Page-Object-Anpassung) verifiziert werden soll, vergleicht `verify-fix.sh` die v2-Tests auf `master` (Baseline) gegen den Fix-Branch:
+
+```bash
+# Vergleicht master vs feature/update-page-objects
+./verify-fix.sh feature/update-page-objects
+
+# Mit anderem LLM-Provider
+./verify-fix.sh feature/update-page-objects openai
+```
+
+**Voraussetzungen:**
+- `jq` muss installiert sein (`choco install jq` / `brew install jq`)
+- Der angegebene Branch muss lokal existieren
+- Lokale Änderungen werden automatisch gestasht und nach dem Lauf wiederhergestellt
+
+**Was passiert:**
+1. Infrastruktur (Emulator + Backend + Forwarder) wird **einmalig** gestartet — bleibt zwischen den Läufen aktiv
+2. `git checkout master` → v2-Tests laufen → `build/reports/verify/cucumber-baseline.json`
+3. `git checkout <fix-branch>` → v2-Tests laufen → `build/reports/verify/cucumber-fix.json`
+4. Szenario-für-Szenario-Vergleich mit Markern: `[FIXED]`, `[REGRESSION]`, `[OK]`, `[STILL FAILING]`
+
+**Beispiel-Ausgabe:**
+
+```
+╔══════════════════════════════════════════════════╗
+║  Verification Results                            ║
+╠══════════════════════════════════════════════════╣
+║  Baseline:  3/5 passed, 2 failed                 ║
+║  Fix:       5/5 passed, 0 failed                 ║
+╠══════════════════════════════════════════════════╣
+║  Scenario Comparison:                            ║
+║    [OK]            Direkte Verbindung finden     ║
+║    [OK]            Verbindung mit Umstieg        ║
+║    [OK]            Keine Verbindung gefunden     ║
+║    [FIXED]         Einfache ID-Änderung wird... ║
+║    [FIXED]         Verbindungssuche mit Umst... ║
+╚══════════════════════════════════════════════════╝
+```
+
+Reports landen unter `build/reports/verify/cucumber-baseline.html` und `cucumber-fix.html`.
+
+> **Optimierung:** Da Emulator und Backend zwischen den beiden Läufen weiterlaufen, wird nur der `test-runner`-Container neu gebaut — Ersparnis ~3-5 Minuten pro Verifikation.
+
 ---
 
 ## Architektur
@@ -349,10 +395,7 @@ graph TB
             TA[TriageAgent]
             LH[LocatorHealer]
             SH[StepHealer]
-            MCE[McpContextEnricher]
         end
-
-        MCP[Appium MCP Server<br/>45+ Tools]
     end
 
     LLM_C[Claude<br/>claude-sonnet-4-6]
@@ -372,9 +415,6 @@ graph TB
     HO --> TA
     TA --> LH
     TA --> SH
-    HO -.->|optional| MCE
-    MCE --> MCP
-    MCP --> AS
     TA --> LLM_C
     TA --> LLM_G
     TA --> LLM_M
@@ -389,19 +429,25 @@ graph TB
     style PC fill:#ffffcc
 ```
 
-### Hybrid-Ansatz: Decorator + MCP
+### Decorator-Ansatz
 
-Das Projekt kombiniert zwei Integrationsmuster:
+Das Projekt nutzt den Decorator-Pattern für die Integration:
 
 | Schicht | Muster | Einsatz |
 |---------|--------|---------|
 | **Test-Ausführung** | Decorator Pattern | `SelfHealingAppiumDriver` umwickelt `AppiumDriver` — Tests laufen schnell mit nativem Client |
-| **Healing-Agent** | MCP Client | Spring AI verbindet sich zum offiziellen `appium/appium-mcp` Server für Screenshots und DOM-Exploration |
+| **Healing-Agent** | Spring AI ChatClient | Direkter LLM-Call mit atomar im `FailureContext` gesammeltem Kontext (Page Source + Screenshot + Page-Object-Source) |
 
 **Vorteile:**
 - Im Normalfall (kein Fehler) läuft der Test mit voller Geschwindigkeit
 - LLM wird **nur bei Fehlern** aufgerufen
-- MCP liefert reichhaltigen Kontext (Screenshot + DOM) für präziseres Healing
+- Vollständiger Kontext wird einmalig vom Decorator gesammelt — deterministisch, cache-freundlich, gut für Benchmarking
+
+> **Hinweis zu MCP:** Eine frühere Version verfolgte einen Hybrid-Ansatz mit
+> `appium/appium-mcp` als Sidecar. Dieser wurde entfernt — siehe
+> [ADR-002](ADR-002-remove-mcp-integration.md) für die Begründung
+> (Healing ist ein bounded task, MCP-Tool-Loops kollidieren mit dem
+> deterministischen Benchmarking-Ziel).
 
 ---
 
@@ -409,11 +455,10 @@ Das Projekt kombiniert zwei Integrationsmuster:
 
 ### Pipeline-Übersicht
 
-Die Healing-Pipeline besteht aus **4 LLM-basierten Agenten** und **2 regelbasierten Handlern**:
+Die Healing-Pipeline besteht aus **3 LLM-basierten Agenten** und **2 regelbasierten Handlern**:
 
 | Komponente | Typ | Beschreibung |
 |------------|-----|-------------|
-| `McpContextEnricher` | LLM-Agent | Kontext-Anreicherung via Appium MCP-Tools (Screenshot, DOM, Element-Exploration) |
 | `TriageAgent` | LLM-Agent | Fehler-Klassifikation (Locator, Step, Umgebung, App-Bug) |
 | `LocatorHealer` | LLM-Agent | Findet alternativen Locator via LLM + DOM-Analyse |
 | `StepHealer` | LLM-Agent | Repariert Step-Logik via LLM |
@@ -428,11 +473,7 @@ Koordiniert werden sie vom `HealingOrchestrator`, der selbst keinen LLM-Call mac
 flowchart TD
     FAIL[Test schlägt fehl<br/>NoSuchElementException] --> CACHE{PromptCache<br/>bereits geheilt?}
     CACHE -->|HIT| RETRY_CACHED[Sofort mit gecachtem<br/>Locator wiederholen]
-    CACHE -->|MISS| MCP_CHECK{MCP<br/>aktiviert?}
-
-    MCP_CHECK -->|Ja| MCP[McpContextEnricher<br/>Screenshot + DOM via MCP]
-    MCP_CHECK -->|Nein| TRIAGE
-    MCP --> TRIAGE
+    CACHE -->|MISS| TRIAGE
 
     TRIAGE[Stufe 1: TriageAgent<br/>Fehler klassifizieren] --> CAT{Kategorie?}
 
@@ -493,7 +534,6 @@ appium-self-healing/
 │   ├── agent/TriageAgent                 LLM-Agent: Fehler-Klassifikation
 │   ├── healing/LocatorHealer             LLM-Agent: Locator-Reparatur
 │   ├── healing/StepHealer                LLM-Agent: Step-Logik-Reparatur
-│   ├── healing/McpContextEnricher        LLM-Agent: Kontext via Appium MCP
 │   ├── healing/EnvironmentChecker        Regelbasiert: HTTP Health Checks
 │   ├── healing/AppBugReporter            Regelbasiert: Bug-Report + Screenshot
 │   ├── healing/HealingOrchestrator       Orchestriert Pipeline (kein LLM)
@@ -540,7 +580,6 @@ appium-self-healing/
 | Build | Gradle (Kotlin DSL) | 9.4.1 |
 | Backend | Spring Boot | 4.0.5 |
 | AI-Framework | Spring AI | 2.0.0-M4 |
-| MCP-Server | appium/appium-mcp (offiziell) | latest |
 | Test-Framework | Cucumber | 7.34.3 |
 | Mobile-Automation | Appium Java Client | 10.1.0 |
 | Android-SDK | compileSdk 36, minSdk 28 | API 36 |
@@ -718,8 +757,6 @@ self-healing:
   source-base-path: ./       # Pfad zu Java-Quelldateien
   triage:
     enabled: true            # Triage-Stufe (false = direkt heilen)
-  mcp:
-    enabled: false           # MCP-Kontext-Anreicherung
 ```
 
 ### LLM-Provider wechseln
@@ -741,7 +778,6 @@ LLM_PROVIDER=local ./run-tests.sh v2
 |---------|------|-------------|
 | `android-emulator` | 6080 (noVNC), 4723 (Appium) | Android Emulator mit Appium |
 | `backend` | 8080 | Zugverbindungs-API |
-| `appium-mcp` | — | MCP-Sidecar (Profil: `mcp`) |
 | `test-runner` | — | Cucumber-Tests |
 | `benchmark-runner` | — | Multi-LLM-Vergleich (Profil: `benchmark`) |
 
@@ -750,7 +786,7 @@ LLM_PROVIDER=local ./run-tests.sh v2
 ## Roadmap
 
 - [x] **Phase 1**: Gradle-Monorepo, Backend, Page Objects, SelfHealingDriver, Cucumber-Tests
-- [x] **Phase 2**: App v2, Prompt-Optimierung, StepHealer, MCP-Integration, Benchmark
+- [x] **Phase 2**: App v2, Prompt-Optimierung, StepHealer, Benchmark
 - [x] **Phase 3**: Root-Cause-Analyse (EnvironmentChecker, AppBugReporter)
 - [x] **Phase 4**: Benchmark-Automatisierung (vollständiger LLM-Vergleich)
 - [ ] **Phase 5**: iOS, PR-Erstellung, Vision-Models, A2A-Integration
@@ -759,4 +795,4 @@ LLM_PROVIDER=local ./run-tests.sh v2
 
 ## Referenz
 
-Dieses Projekt baut auf den Konzepten von [AICurator](https://github.com/dkeiss/aicurator) auf — einem Selenium-basierten Self-Healing-Framework mit Spring AI. Die Kernidee (Decorator-Pattern + LLM-Healing) wird hier auf mobile Tests mit Appium erweitert und um Triage, MCP-Integration und LLM-Benchmarking ergänzt.
+Dieses Projekt baut auf den Konzepten von [AICurator](https://github.com/dkeiss/aicurator) auf — einem Selenium-basierten Self-Healing-Framework mit Spring AI. Die Kernidee (Decorator-Pattern + LLM-Healing) wird hier auf mobile Tests mit Appium erweitert und um Triage, Root-Cause-Analyse und LLM-Benchmarking ergänzt.
