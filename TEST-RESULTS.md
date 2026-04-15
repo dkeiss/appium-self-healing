@@ -1,6 +1,6 @@
 # Test-Ergebnisse
 
-> Letzte Ausführung: **15.04.2026** — erster Lauf mit lokalem LLM (Qwen3-Coder-30B via LM Studio)
+> Letzte Ausführung: **15.04.2026** — zweiter lokaler Lauf mit Devstral Small 2 (via LM Studio), 5/5 PASSED
 
 ## Inhaltsverzeichnis
 
@@ -11,6 +11,7 @@
   - [v2 Self-Healing (OpenAI / GPT-4.1)](#v2-self-healing-openai--gpt-41)
   - [v2 Self-Healing (Mistral / Codestral)](#v2-self-healing-mistral--codestral)
   - [v2 Self-Healing (Lokal / Qwen3-Coder-30B)](#v2-self-healing-lokal--qwen3-coder-30b)
+  - [v2 Self-Healing (Lokal / Devstral Small 2)](#v2-self-healing-lokal--devstral-small-2)
 - [LLM-Vergleich](#llm-vergleich)
 - [verify-fix.sh Validierung](#verify-fixsh-validierung)
 - [Cucumber Reports](#cucumber-reports)
@@ -27,9 +28,10 @@
 | `./run-tests.sh v2 openai` | OpenAI (GPT-4.1) | 5/5 PASSED | 8 Locator geheilt | ~7m 53s |
 | `./run-tests.sh v2 mistral` | Mistral (Codestral) | 5/5 PASSED | 8 Locator geheilt | ~7m 52s |
 | `SPRING_PROFILES_ACTIVE=local-qwen3-30b` | LM Studio (Qwen3-Coder-30B) | 4/5 PASSED | 7/8 Locator geheilt | ~19m 39s |
+| `SPRING_PROFILES_ACTIVE=local-devstral` | LM Studio (Devstral Small 2) | 5/5 PASSED | 8/8 Locator geheilt | ~24m 37s |
 | `./verify-fix.sh` | Anthropic | Baseline + Fix PASSED | Infra-Optimierung validiert | ~15m |
 
-**Alle 3 Cloud-Provider heilen sämtliche 8 Locator-Änderungen erfolgreich. Qwen3-Coder-30B (lokal) heilt 7/8 — `text_to` wird als nicht-existenter `label_to` halluziniert.**
+**Alle 3 Cloud-Provider heilen sämtliche 8 Locator-Änderungen erfolgreich. Devstral Small 2 erreicht als lokales Modell ebenfalls 8/8. Qwen3-Coder-30B heilt 7/8 — `text_to` wird als nicht-existenter `label_to` halluziniert.**
 
 ---
 
@@ -285,29 +287,84 @@ Triage-Confidence war bei allen Fällen konstant **0.95** mit Kategorie `LOCATOR
 
 ---
 
+### v2 Self-Healing (Lokal / Devstral Small 2)
+
+> Zweiter Lauf mit lokalem LLM — Mistral Devstral Small 2 (2512) auf derselben LM-Studio-Installation, RTX 3090 (24 GB VRAM).
+
+```
+╔══════════════════════════════════════════════════╗
+║  App Version: v2                                 ║
+║  LLM Provider: local-devstral (LM Studio)        ║
+║  Modell: mistralai/devstral-small-2-2512         ║
+║  Backend: OpenAI-kompatible REST-API             ║
+║  Dauer: 24m 37s                                  ║
+║  Lauf: 2026-04-15 18:02–18:26                    ║
+╚══════════════════════════════════════════════════╝
+```
+
+| # | Szenario | Ergebnis | Dauer |
+|---|----------|----------|-------|
+| 1 | Direkte Verbindung finden | PASSED | 976 s (6 Heals) |
+| 2 | Verbindung mit Umstieg | PASSED | 201 s (1 Heal + Cache) |
+| 3 | Keine Verbindung gefunden | PASSED | 174 s (1 Heal + Cache) |
+| 4 | Einfache ID-Änderung wird geheilt | PASSED | 52 s (Cache) |
+| 5 | Verbindungssuche mit Umstieg nach UI-Redesign | PASSED | 63 s (Cache) |
+
+**Geheilte Locatoren (8/8 korrekt, jeweils im 1. Versuch):**
+
+| v1-Locator | Vorschlag Devstral | Strategie | Latenz | Ergebnis |
+|------------|--------------------|-----------|--------|----------|
+| `input_from` | `departure_station` | `By.id` | 112.1 s | ✅ |
+| `input_to` | `arrival_station` | `By.id` | 115.7 s | ✅ |
+| `btn_search` | `Suche starten` | `AppiumBy.accessibilityId` | 115.5 s | ✅ |
+| `connection_item` | `journey_card` | `By.id` | 125.6 s | ✅ |
+| `text_from` | `label_departure` | `By.id` | 121.8 s | ✅ |
+| `text_to` | `label_arrival` | `By.id` | 118.6 s | ✅ |
+| `text_transfers` | `label_changes` | `By.id` | 111.1 s | ✅ |
+| `text_no_results` | `empty_state_text` | `By.id` | 97.7 s | ✅ |
+
+**Token- & Latenz-Metriken pro Heal-Call:**
+
+| Phase | Prompt Tokens | Completion Tokens | Total | Latenz |
+|-------|---------------|-------------------|-------|--------|
+| Triage | ~2.580–3.076 | ~73–101 | ~2.658–3.175 | ~23–28 s |
+| LocatorHealer | ~4.486–5.840 | ~620–758 | ~5.230–6.506 | ~85–105 s |
+| **Gesamt pro Locator** | **~7.100–8.900** | **~700–850** | **~7.900–9.700** | **~97–126 s** |
+
+Triage-Confidence war bei allen Fällen konstant **0.95** mit Kategorie `LOCATOR_CHANGED`. **Keine Retry-Loops, keine Halluzinationen.**
+
+**Vergleich zu Qwen3-Coder-30B (selbe Hardware, selbe App):**
+
+- **Heal-Rate:** Devstral 8/8 vs Qwen3 7/8 (Qwen3 halluzinierte `label_to` für `text_to`).
+- **Heal-Konsistenz:** Devstral wählte für `text_from`/`text_to` das sauber generalisierende `label_departure`/`label_arrival`; Qwen3 ging bei `text_from` auf die textbasierte Accessibility-ID `Berlin Hbf` (fragil gegenüber Testdaten) und bei `text_to` in den Retry-Loop.
+- **Latenz/Heal:** Devstral ~110 s vs Qwen3 ~75 s — Devstral ist pro Call ~45 % langsamer, produziert dafür aber beim ersten Versuch einen funktionierenden Locator.
+- **Gesamtdauer:** Devstral 24m 37s vs Qwen3 19m 39s. Trotz langsamerer Einzel-Calls liegt Devstral nur ~5 min dahinter, weil kein Retry-Zyklus nötig war.
+
+---
+
 ## LLM-Vergleich
 
 ### Ergebnis-Matrix
 
-| Metrik | Anthropic | OpenAI | Mistral | Qwen3-Coder-30B (lokal) |
-|--------|-----------|--------|---------|-------------------------|
-| **Szenarien bestanden** | 5/5 (100%) | 5/5 (100%) | 5/5 (100%) | **4/5 (80%)** |
-| **Locatoren geheilt** | 8/8 | 8/8 | 8/8 | **7/8** |
-| **Test-Dauer** | 8m 50s | 7m 53s | 7m 52s | **19m 39s** |
-| **Cache Misses** | 8 | 8 | 8 | 8 |
-| **Cache Hits** | 11–16 | 16 | 16 | — |
-| **btn_search Strategie** | `By.id("fab_search")` | `By.id("fab_search")` | `accessibilityId("Suche starten")` | `accessibilityId("Suche starten")` |
-| **Infrastruktur** | Cloud | Cloud | Cloud | Lokal (RTX 3090) |
-| **Kosten/Lauf** | $$ | $$ | $$ | 0 $ (Strom) |
+| Metrik | Anthropic | OpenAI | Mistral | Qwen3-Coder-30B (lokal) | Devstral Small 2 (lokal) |
+|--------|-----------|--------|---------|-------------------------|--------------------------|
+| **Szenarien bestanden** | 5/5 (100%) | 5/5 (100%) | 5/5 (100%) | **4/5 (80%)** | **5/5 (100%)** |
+| **Locatoren geheilt** | 8/8 | 8/8 | 8/8 | **7/8** | **8/8** |
+| **Test-Dauer** | 8m 50s | 7m 53s | 7m 52s | 19m 39s | **24m 37s** |
+| **Cache Misses** | 8 | 8 | 8 | 8 | 8 |
+| **Cache Hits** | 11–16 | 16 | 16 | — | 14 |
+| **btn_search Strategie** | `By.id("fab_search")` | `By.id("fab_search")` | `accessibilityId("Suche starten")` | `accessibilityId("Suche starten")` | `accessibilityId("Suche starten")` |
+| **Infrastruktur** | Cloud | Cloud | Cloud | Lokal (RTX 3090) | Lokal (RTX 3090) |
+| **Kosten/Lauf** | $$ | $$ | $$ | 0 $ (Strom) | 0 $ (Strom) |
 
 ### Beobachtungen
 
-1. **Alle 3 Cloud-LLMs schaffen 100% Healing-Rate** für die 8 Locator-Änderungen (EASY + MEDIUM Schwierigkeit). **Qwen3-Coder-30B erreicht 87.5%** — ein respektables Ergebnis für ein lokales 18-GB-Modell.
-2. **Mistral und Qwen3-30B nutzen AccessibilityId** für den Such-Button statt der Test-Tag-ID — eine valide Alternative, da die App sowohl `testTag("fab_search")` als auch `contentDescription("Suche starten")` hat.
+1. **Alle 3 Cloud-LLMs und Devstral Small 2 schaffen 100% Healing-Rate** für die 8 Locator-Änderungen. **Qwen3-Coder-30B erreicht 87.5%** — ein respektables Ergebnis, aber mit einer konsistenten Schwäche bei `text_to`.
+2. **Mistral, Qwen3-30B und Devstral nutzen AccessibilityId** für den Such-Button statt der Test-Tag-ID — eine valide Alternative, da die App sowohl `testTag("fab_search")` als auch `contentDescription("Suche starten")` hat.
 3. **Anthropic** ist etwas langsamer im Gesamtdurchlauf (8m 50s vs. ~7m 52s), wahrscheinlich wegen der ausführlicheren Triage-Analyse.
 4. **Cache Hit-Rates** sind bei allen Providern identisch (67%), da der Cache unabhängig vom LLM-Provider arbeitet.
-5. **Qwen3-30B ist ~2.5× langsamer** als die Cloud-Provider — 75–80 s pro Locator-Heal vs. 5–15 s bei Cloud-Modellen. Der Retry-Loop bei `text_to` treibt die Gesamtdauer zusätzlich hoch.
-6. **Halluzination im Retry:** Qwen3-30B schlägt nach einem fehlgeschlagenen Heal denselben Locator erneut vor. Der Prompt sollte explizit eine "Do-not-repeat"-Regel für bereits gescheiterte Vorschläge erhalten.
+5. **Lokale LLMs sind ~2.5–3× langsamer** als die Cloud-Provider — 75–115 s pro Locator-Heal vs. 5–15 s bei Cloud-Modellen. Devstral ist pro Call langsamer als Qwen3, vermeidet aber Retry-Loops.
+6. **Devstral > Qwen3-30B für Locator-Generalisierung:** Devstral schlägt `label_departure`/`label_arrival` vor (symmetrisches Namensmuster), Qwen3 halluziniert asymmetrisch `label_to` und wiederholt den Vorschlag im Retry. Prompt-Guardrail gegen Wiederholung ist weiterhin sinnvoll, auch wenn Devstral den Fehler nicht triggert.
 
 ---
 

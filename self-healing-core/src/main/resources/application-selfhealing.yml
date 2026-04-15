@@ -142,7 +142,7 @@ spring:
       api-key: lm-studio
       chat:
         options:
-          model: devstral-small-2-2512
+          model: mistralai/devstral-small-2-2512
           temperature: 0.1
 
 ---
