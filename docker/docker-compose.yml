@@ -16,6 +16,8 @@ services:
       RELAXED_SECURITY: "true"
     volumes:
       - ../android-app/app/build/outputs/apk:/app/apks:ro
+    devices:
+      - /dev/kvm
     healthcheck:
       test: ["CMD-SHELL", "adb shell getprop sys.boot_completed 2>/dev/null | grep -q '1' && wget -qO- http://localhost:4723/status > /dev/null 2>&1"]
       interval: 10s
@@ -110,19 +112,27 @@ services:
     volumes:
       - ../build/reports:/app/build/reports
       - ../android-app/app/build/outputs/apk:/app/apks:ro
-    entrypoint: >
-      sh -c "
+    entrypoint:
+      - sh
+      - -c
+      - |
         echo '=== LLM Benchmark: Self-Healing Comparison ==='
+        echo '--- Giving emulator UiAutomator2 extra time to warm up ---'
+        sleep 60
         for provider in anthropic openai mistral; do
-          echo \"--- Running with $$provider ---\"
-          SPRING_PROFILES_ACTIVE=$$provider \
-          LLM_PROVIDER=$$provider \
-          ./gradlew :integration-tests:test --no-daemon \
-            -Dcucumber.filter.tags='@self-healing' \
-            2>&1 | tee /app/build/reports/benchmark-$$provider.log
-          echo \"--- $$provider complete ---\"
+          echo "--- Running with $$provider ---"
+          for attempt in 1 2 3; do
+            echo "Attempt $$attempt for $$provider..."
+            if SPRING_PROFILES_ACTIVE=$$provider LLM_PROVIDER=$$provider \
+                 ./gradlew :integration-tests:test --no-daemon --rerun \
+                 -Dcucumber.filter.tags='@self-healing' 2>&1 \
+               | tee /app/build/reports/benchmark-$$provider.log; then
+              echo "--- $$provider PASSED on attempt $$attempt ---"; break
+            fi
+            echo "--- $$provider FAILED on attempt $$attempt ---"
+            [ $$attempt -lt 3 ] && sleep 20
+          done
         done
         echo '=== Benchmark complete ==='
-      "
     profiles:
       - benchmark

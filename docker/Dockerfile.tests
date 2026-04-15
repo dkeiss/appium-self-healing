@@ -5,7 +5,7 @@ WORKDIR /app
 # Copy Gradle wrapper and build config
 COPY gradlew settings.gradle.kts build.gradle.kts gradle.properties ./
 COPY gradle/ gradle/
-RUN chmod +x gradlew
+RUN sed -i 's/\r$//' gradlew && chmod +x gradlew
 
 # Copy source modules
 COPY self-healing-core/ self-healing-core/
