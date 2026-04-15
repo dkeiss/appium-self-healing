@@ -87,6 +87,7 @@ services:
       SPRING_PROFILES_ACTIVE: "${LLM_PROVIDER:-anthropic}"
       APP_APK_PATH: "/app/apks/${APP_VERSION:-v1}/debug/app-${APP_VERSION:-v1}-debug.apk"
       APP_VERSION: "${APP_VERSION:-v1}"
+      LM_STUDIO_URL: "${LM_STUDIO_URL:-http://host.docker.internal:1234}"
     volumes:
       - ../build/reports:/app/integration-tests/build/reports
       - ../android-app/app/build/outputs/apk:/app/apks:ro
@@ -109,6 +110,8 @@ services:
       APP_APK_PATH: "/app/apks/v2/debug/app-v2-debug.apk"
     env_file:
       - .env
+    environment:
+      LM_STUDIO_URL: "${LM_STUDIO_URL:-http://host.docker.internal:1234}"
     volumes:
       - ../build/reports:/app/build/reports
       - ../android-app/app/build/outputs/apk:/app/apks:ro
@@ -119,7 +122,7 @@ services:
         echo '=== LLM Benchmark: Self-Healing Comparison ==='
         echo '--- Giving emulator UiAutomator2 extra time to warm up ---'
         sleep 60
-        for provider in anthropic openai mistral; do
+        for provider in anthropic openai mistral local-qwen3-next local-devstral local-qwen3-30b; do
           echo "--- Running with $$provider ---"
           for attempt in 1 2 3; do
             echo "Attempt $$attempt for $$provider..."

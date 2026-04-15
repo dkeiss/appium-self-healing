@@ -1,6 +1,6 @@
 # Test-Ergebnisse
 
-> Letzte Ausführung: **09.04.2026** — Healing-Screenshots im Cucumber-Report verifiziert (roter Border sichtbar)
+> Letzte Ausführung: **15.04.2026** — erster Lauf mit lokalem LLM (Qwen3-Coder-30B via LM Studio)
 
 ## Inhaltsverzeichnis
 
@@ -10,6 +10,7 @@
   - [v2 Self-Healing (Anthropic)](#v2-self-healing-anthropic)
   - [v2 Self-Healing (OpenAI / GPT-4.1)](#v2-self-healing-openai--gpt-41)
   - [v2 Self-Healing (Mistral / Codestral)](#v2-self-healing-mistral--codestral)
+  - [v2 Self-Healing (Lokal / Qwen3-Coder-30B)](#v2-self-healing-lokal--qwen3-coder-30b)
 - [LLM-Vergleich](#llm-vergleich)
 - [verify-fix.sh Validierung](#verify-fixsh-validierung)
 - [Cucumber Reports](#cucumber-reports)
@@ -25,9 +26,10 @@
 | `./run-tests.sh v2` | Anthropic (Claude Sonnet) | 5/5 PASSED | 8 Locator geheilt | ~8m 50s |
 | `./run-tests.sh v2 openai` | OpenAI (GPT-4.1) | 5/5 PASSED | 8 Locator geheilt | ~7m 53s |
 | `./run-tests.sh v2 mistral` | Mistral (Codestral) | 5/5 PASSED | 8 Locator geheilt | ~7m 52s |
+| `SPRING_PROFILES_ACTIVE=local-qwen3-30b` | LM Studio (Qwen3-Coder-30B) | 4/5 PASSED | 7/8 Locator geheilt | ~19m 39s |
 | `./verify-fix.sh` | Anthropic | Baseline + Fix PASSED | Infra-Optimierung validiert | ~15m |
 
-**Alle 3 LLM-Provider heilen sämtliche 8 Locator-Änderungen erfolgreich.**
+**Alle 3 Cloud-Provider heilen sämtliche 8 Locator-Änderungen erfolgreich. Qwen3-Coder-30B (lokal) heilt 7/8 — `text_to` wird als nicht-existenter `label_to` halluziniert.**
 
 ---
 
@@ -214,25 +216,98 @@ Alle anderen Locatoren werden identisch geheilt.
 
 ---
 
+### v2 Self-Healing (Lokal / Qwen3-Coder-30B)
+
+> Tests gegen die v2-App mit einem lokal laufenden Modell — LM Studio auf Windows 11, RTX 3090 (24 GB VRAM).
+
+```
+╔══════════════════════════════════════════════════╗
+║  App Version: v2                                 ║
+║  LLM Provider: local-qwen3-30b (LM Studio)       ║
+║  Modell: qwen/qwen3-coder-30b (18.63 GB MoE)     ║
+║  Backend: OpenAI-kompatible REST-API             ║
+║  Dauer: 19m 39s                                  ║
+║  Lauf: 2026-04-15 14:32–14:53                    ║
+╚══════════════════════════════════════════════════╝
+```
+
+| # | Szenario | Ergebnis | Dauer |
+|---|----------|----------|-------|
+| 1 | Direkte Verbindung finden | **FAILED** | 770 s |
+| 2 | Verbindung mit Umstieg | PASSED | 157 s |
+| 3 | Keine Verbindung gefunden | PASSED | 130 s |
+| 4 | Einfache ID-Änderung wird geheilt | PASSED | 50 s (Cache) |
+| 5 | Verbindungssuche mit Umstieg nach UI-Redesign | PASSED | 63 s (Cache) |
+
+**Geheilte Locatoren (7/8 korrekt):**
+
+| v1-Locator | Vorschlag Qwen3-30B | Strategie | Ergebnis |
+|------------|---------------------|-----------|----------|
+| `input_from` | `departure_station` | `By.id` | OK |
+| `input_to` | `arrival_station` | `By.id` | OK |
+| `btn_search` | `Suche starten` | `accessibilityId` | OK |
+| `connection_item` | `journey_card` | `By.id` | OK |
+| `text_from` | `Berlin Hbf` | `accessibilityId` | text-basiert, nicht generisch |
+| `text_to` | `label_to` | `By.id` | halluziniert, existiert nicht |
+| `text_transfers` | `label_changes` | `By.id` | OK |
+| `text_no_results` | `Keine Verbindungen gefunden` | `accessibilityId` | OK |
+
+**Token- & Latenz-Metriken pro Heal-Call:**
+
+| Phase | Prompt Tokens | Completion Tokens | Total | Latenz |
+|-------|---------------|-------------------|-------|--------|
+| Triage | ~2.600 | ~100 | ~2.700 | ~15–30 s |
+| LocatorHealer | ~5.000–6.000 | ~500–750 | ~5.500–6.800 | ~60–80 s |
+| **Gesamt pro Locator** | **~7.600–8.600** | **~600–850** | **~8.200–9.500** | **~75–110 s** |
+
+Triage-Confidence war bei allen Fällen konstant **0.95** mit Kategorie `LOCATOR_CHANGED`.
+
+**Fehlerfall `text_to` im Detail:**
+
+```
+14:43:15  Healing attempt 1/3 for: By.id: text_to
+14:44:31  Healed locator: By.id: text_to → By.id: label_to (75 s)
+           → label_to existiert nicht in v2-XML
+14:44:41  Healing attempt 2/3 for: By.id: text_to
+14:46:14  Healed locator: By.id: label_to → By.id: label_to (74 s)
+           → identischer Vorschlag im Retry
+14:46:24  Healing attempt 3/3 for: By.id: text_to
+           → max-retries erschöpft → Szenario FAILED
+```
+
+> **Root-Cause-Hypothese:** Das Modell sieht in der v2-XML `label_departure`/`label_arrival` als Muster und extrapoliert fälschlich zu `label_to`. Im Retry wird derselbe Vorschlag wiederholt, weil der Prompt nicht explizit ausschließt, bereits fehlgeschlagene Locatoren erneut vorzuschlagen.
+
+**Bugs, die für diesen Lauf gefixt werden mussten:**
+
+1. **`CucumberSpringConfig.java`** — hardcodierter `spring.autoconfigure.exclude` für OpenAI + Mistral entfernt (verhinderte die Bean-Erzeugung für LM Studio, obwohl LM Studio der OpenAI-Client ist)
+2. **`application-selfhealing.yml`** — `/v1` aus `base-url` entfernt (Spring AI hängt es selbst an → POST ging an `/v1/v1/chat/completions`, LM Studio antwortete mit HTTP 200 und leerem Body, Spring AI loggte "No choices returned" und `ChatResponse.getResult()` war null)
+3. **`TestConfig.java`** — `setNewCommandTimeout(Duration.ofMinutes(10))` ergänzt (Default von 60 s killte die Appium-Session während der 75-s-LocatorHeal-Calls)
+
+---
+
 ## LLM-Vergleich
 
 ### Ergebnis-Matrix
 
-| Metrik | Anthropic | OpenAI | Mistral |
-|--------|-----------|--------|---------|
-| **Szenarien bestanden** | 5/5 (100%) | 5/5 (100%) | 5/5 (100%) |
-| **Locatoren geheilt** | 8/8 | 8/8 | 8/8 |
-| **Test-Dauer** | 8m 50s | 7m 53s | 7m 52s |
-| **Cache Misses** | 8 | 8 | 8 |
-| **Cache Hits** | 11–16 | 16 | 16 |
-| **btn_search Strategie** | `By.id("fab_search")` | `By.id("fab_search")` | `accessibilityId("Suche starten")` |
+| Metrik | Anthropic | OpenAI | Mistral | Qwen3-Coder-30B (lokal) |
+|--------|-----------|--------|---------|-------------------------|
+| **Szenarien bestanden** | 5/5 (100%) | 5/5 (100%) | 5/5 (100%) | **4/5 (80%)** |
+| **Locatoren geheilt** | 8/8 | 8/8 | 8/8 | **7/8** |
+| **Test-Dauer** | 8m 50s | 7m 53s | 7m 52s | **19m 39s** |
+| **Cache Misses** | 8 | 8 | 8 | 8 |
+| **Cache Hits** | 11–16 | 16 | 16 | — |
+| **btn_search Strategie** | `By.id("fab_search")` | `By.id("fab_search")` | `accessibilityId("Suche starten")` | `accessibilityId("Suche starten")` |
+| **Infrastruktur** | Cloud | Cloud | Cloud | Lokal (RTX 3090) |
+| **Kosten/Lauf** | $$ | $$ | $$ | 0 $ (Strom) |
 
 ### Beobachtungen
 
-1. **Alle 3 LLMs schaffen 100% Healing-Rate** für die 8 Locator-Änderungen (EASY + MEDIUM Schwierigkeit)
-2. **Mistral nutzt AccessibilityId** für den Such-Button statt der Test-Tag-ID — eine valide Alternative, da die App sowohl `testTag("fab_search")` als auch `contentDescription("Suche starten")` hat
-3. **Anthropic** ist etwas langsamer im Gesamtdurchlauf (8m 50s vs. ~7m 52s), wahrscheinlich wegen der ausführlicheren Triage-Analyse
-4. **Cache Hit-Rates** sind bei allen Providern identisch (67%), da der Cache unabhängig vom LLM-Provider arbeitet
+1. **Alle 3 Cloud-LLMs schaffen 100% Healing-Rate** für die 8 Locator-Änderungen (EASY + MEDIUM Schwierigkeit). **Qwen3-Coder-30B erreicht 87.5%** — ein respektables Ergebnis für ein lokales 18-GB-Modell.
+2. **Mistral und Qwen3-30B nutzen AccessibilityId** für den Such-Button statt der Test-Tag-ID — eine valide Alternative, da die App sowohl `testTag("fab_search")` als auch `contentDescription("Suche starten")` hat.
+3. **Anthropic** ist etwas langsamer im Gesamtdurchlauf (8m 50s vs. ~7m 52s), wahrscheinlich wegen der ausführlicheren Triage-Analyse.
+4. **Cache Hit-Rates** sind bei allen Providern identisch (67%), da der Cache unabhängig vom LLM-Provider arbeitet.
+5. **Qwen3-30B ist ~2.5× langsamer** als die Cloud-Provider — 75–80 s pro Locator-Heal vs. 5–15 s bei Cloud-Modellen. Der Retry-Loop bei `text_to` treibt die Gesamtdauer zusätzlich hoch.
+6. **Halluzination im Retry:** Qwen3-30B schlägt nach einem fehlgeschlagenen Heal denselben Locator erneut vor. Der Prompt sollte explizit eine "Do-not-repeat"-Regel für bereits gescheiterte Vorschläge erhalten.
 
 ---
 
