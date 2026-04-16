@@ -19,4 +19,6 @@ dependencies {
     implementation("org.kohsuke:github-api:1.330")
 
     testImplementation("org.springframework.boot:spring-boot-starter-test")
+    // Gradle 9+ no longer auto-provides the JUnit Platform launcher; declare it explicitly.
+    testRuntimeOnly("org.junit.platform:junit-platform-launcher")
 }

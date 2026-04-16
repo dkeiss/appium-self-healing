@@ -4,7 +4,7 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 
 @ConfigurationProperties(prefix = "self-healing")
 public record SelfHealingProperties(boolean enabled, int maxRetries, String llmProvider, String sourceBasePath,
-        Triage triage, Mcp mcp, EnvironmentCheck environmentCheck, BugReports bugReports, GitPr gitPr) {
+        Triage triage, Mcp mcp, Cache cache, EnvironmentCheck environmentCheck, BugReports bugReports, GitPr gitPr) {
 
     public SelfHealingProperties {
         if (maxRetries <= 0)
@@ -15,6 +15,8 @@ public record SelfHealingProperties(boolean enabled, int maxRetries, String llmP
             triage = new Triage(true);
         if (mcp == null)
             mcp = new Mcp(false);
+        if (cache == null)
+            cache = Cache.defaults();
         if (environmentCheck == null)
             environmentCheck = EnvironmentCheck.defaults();
         if (bugReports == null)
@@ -27,6 +29,18 @@ public record SelfHealingProperties(boolean enabled, int maxRetries, String llmP
     }
 
     public record Mcp(boolean enabled) {
+    }
+
+    /**
+     * Configuration for the in-memory locator healing cache. Disabling is useful for LLM benchmark runs where a single
+     * wrong heal in an early scenario would otherwise be reused (via cache hit) and cause every subsequent scenario to
+     * fail at the same step — masking the LLM's ability to heal the remaining locators.
+     */
+    public record Cache(boolean enabled) {
+
+        public static Cache defaults() {
+            return new Cache(true);
+        }
     }
 
     public record EnvironmentCheck(boolean enabled, String backendUrl, String appiumUrl, long connectTimeoutMs,

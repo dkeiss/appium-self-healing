@@ -35,12 +35,20 @@ public class HealingOrchestrator {
     private final ApplicationEventPublisher eventPublisher;
 
     public HealingResult attemptHealing(FailureContext context) {
-        // Check cache first
+        boolean cacheEnabled = properties.cache().enabled();
         String cacheKey = buildCacheKey(context);
-        HealingResult cached = promptCache.get(cacheKey);
-        if (cached != null) {
-            log.info("Using cached healing for: {}", cacheKey);
-            return cached;
+
+        // Check cache first — skipped entirely when disabled so benchmark runs can
+        // compare the LLM's heal quality per scenario without a bad early heal
+        // poisoning every subsequent scenario via cache hit.
+        if (cacheEnabled) {
+            HealingResult cached = promptCache.get(cacheKey);
+            if (cached != null) {
+                log.info("Using cached healing for: {}", cacheKey);
+                return cached;
+            }
+        } else {
+            log.debug("Cache disabled — skipping lookup for: {}", cacheKey);
         }
 
         // Stage 0 (optional): MCP enrichment
@@ -53,7 +61,7 @@ public class HealingOrchestrator {
         HealingResult result = delegateToHandler(triage, enrichedContext);
 
         // Stage 3: Post-processing
-        if (result.success()) {
+        if (cacheEnabled && result.success()) {
             promptCache.put(cacheKey, result);
         }
         publishHealingEvent(enrichedContext, triage, result);

@@ -1,3 +1,18 @@
+# Disable Spring AI embedding / image / audio / moderation auto-configs globally —
+# the self-healing pipeline only needs a ChatClient. Without this, the Mistral and
+# OpenAI embedding auto-configs fire on every profile and fail with "API key must be set"
+# whenever the active profile is a different provider (e.g. anthropic).
+spring:
+  ai:
+    model:
+      embedding: none
+      image: none
+      audio:
+        speech: none
+        transcription: none
+      moderation: none
+      ocr: none
+
 self-healing:
   enabled: true
   max-retries: 3
@@ -7,6 +22,8 @@ self-healing:
     enabled: true
   mcp:
     enabled: false  # Enable when appium-mcp sidecar is running
+  cache:
+    enabled: ${SELF_HEALING_CACHE_ENABLED:true}  # Set to false for LLM benchmark runs so a bad early heal cannot poison later scenarios
   git-pr:
     enabled: false  # Enable to auto-create PRs for healed locators
     remote-name: origin

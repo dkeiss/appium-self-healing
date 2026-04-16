@@ -450,6 +450,28 @@ Ohne den hochgesetzten `max-tokens`-Wert würde der Reasoning-Block jeden Respon
 
 ---
 
+## Cache-Bypass für LLM-Benchmarks (`self-healing.cache.enabled`)
+
+Der im GLM-Abschnitt beschriebene Cache-Kaskaden-Effekt ist als „Folge-Task" markiert; dieser ist jetzt umgesetzt. Neu: die Property `self-healing.cache.enabled` (Default `true`, überschreibbar via ENV `SELF_HEALING_CACHE_ENABLED=false`).
+
+**Was passiert bei `false`:**
+- `HealingOrchestrator.attemptHealing()` überspringt sowohl `promptCache.get()` als auch `promptCache.put()`.
+- Ein falscher Heal in Szenario 1 landet nicht mehr im Cache und blockiert keine Folge-Szenarien.
+- Jeder Locator wird pro Szenario frisch vom LLM geheilt — teurer, aber für Benchmark-Vergleiche fair.
+
+**Benchmark-Rerun mit GLM-4.7-Flash:**
+
+```bash
+SPRING_PROFILES_ACTIVE=local-glm-4-7-flash SELF_HEALING_CACHE_ENABLED=false \
+  ./gradlew :integration-tests:test
+```
+
+> **Hinweis:** Der Cache-Bypass-Rerun mit GLM ist noch nicht ausgeführt — sobald die neuen Zahlen vorliegen, werden sie in den GLM-Abschnitt und in die Direktvergleichs-Matrix eingepflegt.
+
+**Produktive Runs:** Default bleibt `cache.enabled=true`, sonst kostet jeder einzigartige Locator bei jeder Wiederverwendung einen vollen LLM-Call.
+
+---
+
 ## LLM-Vergleich
 
 ### Ergebnis-Matrix
