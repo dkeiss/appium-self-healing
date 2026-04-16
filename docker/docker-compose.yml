@@ -108,10 +108,9 @@ services:
       APPIUM_URL: "http://android-emulator:4723"
       BACKEND_URL: "http://backend:8080"
       APP_APK_PATH: "/app/apks/v2/debug/app-v2-debug.apk"
+      LM_STUDIO_URL: "${LM_STUDIO_URL:-http://host.docker.internal:1234}"
     env_file:
       - .env
-    environment:
-      LM_STUDIO_URL: "${LM_STUDIO_URL:-http://host.docker.internal:1234}"
     volumes:
       - ../build/reports:/app/build/reports
       - ../android-app/app/build/outputs/apk:/app/apks:ro
