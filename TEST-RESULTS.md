@@ -10,6 +10,7 @@
   - [v2 Self-Healing (Anthropic)](#v2-self-healing-anthropic)
   - [v2 Self-Healing (OpenAI / GPT-4.1)](#v2-self-healing-openai--gpt-41)
   - [v2 Self-Healing (Mistral / Codestral)](#v2-self-healing-mistral--codestral)
+  - [v2 Self-Healing (Lokal / GLM-4.7-Flash)](#v2-self-healing-lokal--glm-47-flash)
 - [LLM-Vergleich](#llm-vergleich)
 - [verify-fix.sh Validierung](#verify-fixsh-validierung)
 - [Cucumber Reports](#cucumber-reports)
@@ -211,6 +212,46 @@ Alle anderen Locatoren werden identisch geheilt.
 | Keine Verbindung gefunden | Meldung prüfen | 20.2s |
 
 > **Hinweis:** Das erste Szenario ist langsamer (~23s/Step vs. ~12s/Step), weil dort die LLM-Calls stattfinden. Folge-Szenarien nutzen den In-Memory-Cache und sind deutlich schneller.
+
+---
+
+### v2 Self-Healing (Lokal / GLM-4.7-Flash)
+
+> Tests gegen die v2-App mit lokalem Reasoning-Modell `zai-org/glm-4.7-flash` über LM Studio (Profil `local-glm-4-7-flash`).
+
+#### Erstlauf mit aktivem Cache (2026-04-16)
+
+```
+╔══════════════════════════════════════════════════╗
+║  App Version: v2                                 ║
+║  LLM Provider: lokal (GLM-4.7-Flash via LM Studio)║
+║  Cache: enabled (Default)                        ║
+║  Ergebnis: 0/5 Szenarien                         ║
+╚══════════════════════════════════════════════════╝
+```
+
+| # | Szenario | Ergebnis | Gescheitert an |
+|---|----------|----------|----------------|
+| 1 | Direkte Verbindung finden | FAILED | `input_to` → falscher Heal auf Label `Ankunftsbahnhof` statt Input-Feld |
+| 2 | Verbindung mit Umstieg | FAILED | identischer Cache-Eintrag für `input_to` |
+| 3 | Keine Verbindung gefunden | FAILED | identischer Cache-Eintrag für `input_to` |
+| 4 | Einfache ID-Änderung wird geheilt | FAILED | identischer Cache-Eintrag für `input_to` |
+| 5 | Verbindungssuche mit Umstieg nach UI-Redesign | FAILED | identischer Cache-Eintrag für `input_to` |
+
+**Tatsächliche Heal-Versuche:** nur 2 von 8 (`input_from` ✅, `input_to` ❌) — die übrigen 6 Locator-Heals (`btn_search`, `connection_item`, `text_from`, `text_to`, `text_transfers`, `text_no_results`) kamen nie dran, weil jedes Folge-Szenario am gleichen gecachten falschen `input_to` starb.
+
+#### Folgelauf mit deaktiviertem Cache
+
+Ab dieser Version gibt es das Flag `self-healing.cache.enabled` (ENV: `SELF_HEALING_CACHE_ENABLED`). Mit `false` überspringt der `HealingOrchestrator` sowohl Cache-Lookup als auch Cache-Write — ein falscher Heal in Szenario 1 wirkt sich damit nicht mehr auf die Folge-Szenarien aus, und jeder Locator wird pro Szenario frisch vom LLM geheilt.
+
+```bash
+SPRING_PROFILES_ACTIVE=local-glm-4-7-flash SELF_HEALING_CACHE_ENABLED=false \
+  ./gradlew :integration-tests:test
+```
+
+Dieser Modus ist ausschließlich für LLM-Benchmark-Vergleiche gedacht: ohne Cache-Poisoning bekommt jedes Modell die Chance, alle 8 Locator zu heilen, unabhängig vom Ausgang des ersten Szenarios. Für produktive Test-Runs bleibt der Cache aktiviert (Default `true`), da er für jeden einzigartigen Locator sonst einen teuren LLM-Call pro Wiederholung bedeuten würde.
+
+> **Hinweis:** Die Ergebnisse des `cache.enabled=false`-Laufs werden nach Abschluss ergänzt.
 
 ---
 

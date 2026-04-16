@@ -3,6 +3,7 @@ package de.keiss.selfhealing.core.healing;
 import de.keiss.selfhealing.core.agent.TriageAgent;
 import de.keiss.selfhealing.core.config.SelfHealingProperties;
 import de.keiss.selfhealing.core.config.SelfHealingProperties.BugReports;
+import de.keiss.selfhealing.core.config.SelfHealingProperties.Cache;
 import de.keiss.selfhealing.core.config.SelfHealingProperties.EnvironmentCheck;
 import de.keiss.selfhealing.core.config.SelfHealingProperties.Mcp;
 import de.keiss.selfhealing.core.config.SelfHealingProperties.Triage;
@@ -51,6 +52,7 @@ class EnvironmentIssueIntegrationTest {
     void unreachableBackend_triggersTerminalDiagnostic_withoutCallingLocatorHealer() {
         // --- Arrange ---
         var properties = new SelfHealingProperties(true, 3, "anthropic", null, new Triage(true), new Mcp(false),
+                Cache.defaults(),
                 new EnvironmentCheck(true, "http://127.0.0.1:1/health", // unreachable — OS rejects connection instantly
                         null, // no Appium probe in this test
                         500, // connect timeout — fail fast
@@ -114,6 +116,7 @@ class EnvironmentIssueIntegrationTest {
 
         try {
             var properties = new SelfHealingProperties(true, 3, "anthropic", null, new Triage(true), new Mcp(false),
+                    Cache.defaults(),
                     new EnvironmentCheck(true, "http://127.0.0.1:" + port + "/health", // reachable
                             null, 500, 500, 50 // retry backoff — short but observable via spy
                     ), BugReports.defaults(), null // gitPr — not relevant for environment tests
