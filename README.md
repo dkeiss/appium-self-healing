@@ -618,6 +618,53 @@ sie zu einem vergleichenden `BenchmarkReport` und druckt die Provider-Tabelle.
 Die jeweiligen API-Keys (`ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, `MISTRAL_API_KEY`)
 bzw. eine lokale LM-Studio-Instanz müssen gesetzt sein.
 
+### Lokale LLMs mit LM Studio
+
+Neben den Cloud-Providern können lokale Modelle über **LM Studio** eingebunden werden. Das Framework unterstützt drei vorkonfigurierte Profile:
+
+| Profil | Modell | Größe (GGUF) | Empf. Quantisierung |
+|---|---|---|---|
+| `local-qwen3-next` | qwen3-coder-next | 48 GB | Q4_K_M |
+| `local-devstral` | devstral-small-2-2512 | 15 GB | Q4_K_M / Q8 |
+| `local-qwen3-30b` | qwen3-coder-30b | 19 GB | Q4_K_M |
+
+#### Voraussetzungen
+
+1. [LM Studio](https://lmstudio.ai) herunterladen und installieren
+2. Modell laden: **Discover → Modellname suchen → Download**
+3. LM Studio-Server starten: **Developer → Start Server** (Port 1234)
+4. Modell-Identifier prüfen: im LM Studio-Server-Log oder unter `GET http://localhost:1234/v1/models` — der zurückgegebene `id`-Wert muss mit dem Profilnamen übereinstimmen
+
+> **Hinweis:** Falls der Modell-Identifier in LM Studio abweicht (z.B. vollständiger Dateiname), kann er über die Umgebungsvariable `LM_STUDIO_MODEL` im generischen `local`-Profil überschrieben werden.
+
+#### Einzel-Test (lokal, ohne Docker)
+
+```bash
+# Ein bestimmtes Modell testen
+LLM_PROVIDER=local-qwen3-30b ./gradlew :integration-tests:test
+
+# Alle drei lokalen Modelle nacheinander (Gradle)
+./gradlew benchmarkAll -PllmProviders=local-qwen3-next,local-devstral,local-qwen3-30b
+```
+
+#### Benchmark mit Docker Compose
+
+LM Studio läuft auf dem Host-Rechner; Docker erreicht es über `host.docker.internal`:
+
+```bash
+# .env anpassen:
+# LLM_PROVIDER=local-qwen3-30b
+# LM_STUDIO_URL=http://host.docker.internal:1234   ← wird automatisch gesetzt
+
+cd docker
+docker compose up test-runner --build
+
+# Oder alle lokalen Modelle im Benchmark-Lauf:
+docker compose --profile benchmark up --build benchmark-runner
+```
+
+Der `benchmark-runner` durchläuft automatisch alle sechs Provider (3 Cloud + 3 lokal). Lokale Modelle benötigen keine API-Keys, müssen aber in LM Studio aktiv geladen sein.
+
 ### Gemessene Metriken
 
 | Metrik | Beschreibung |

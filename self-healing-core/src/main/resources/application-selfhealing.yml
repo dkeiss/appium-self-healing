@@ -44,6 +44,8 @@ spring:
     activate:
       on-profile: anthropic
   ai:
+    model:
+      chat: anthropic
     anthropic:
       api-key: ${ANTHROPIC_API_KEY:}
       chat:
@@ -60,6 +62,8 @@ spring:
     activate:
       on-profile: openai
   ai:
+    model:
+      chat: openai
     openai:
       api-key: ${OPENAI_API_KEY:}
       chat:
@@ -74,6 +78,8 @@ spring:
     activate:
       on-profile: mistral
   ai:
+    model:
+      chat: mistral
     mistralai:
       api-key: ${MISTRAL_API_KEY:}
       chat:
@@ -87,10 +93,97 @@ spring:
     activate:
       on-profile: local
   ai:
+    model:
+      chat: openai
+    anthropic:
+      api-key: disabled-anthropic
+    mistralai:
+      api-key: disabled-mistral
     openai:
-      base-url: http://localhost:1234/v1
+      base-url: ${LM_STUDIO_URL:http://localhost:1234}
       api-key: lm-studio
       chat:
         options:
-          model: local-model
+          model: ${LM_STUDIO_MODEL:local-model}
           temperature: 0.1
+
+---
+spring:
+  config:
+    activate:
+      on-profile: local-qwen3-next
+  ai:
+    model:
+      chat: openai
+    anthropic:
+      api-key: disabled-anthropic
+    mistralai:
+      api-key: disabled-mistral
+    openai:
+      base-url: ${LM_STUDIO_URL:http://localhost:1234}
+      api-key: lm-studio
+      chat:
+        options:
+          model: qwen3-coder-next
+          temperature: 0.1
+
+---
+spring:
+  config:
+    activate:
+      on-profile: local-devstral
+  ai:
+    model:
+      chat: openai
+    anthropic:
+      api-key: disabled-anthropic
+    mistralai:
+      api-key: disabled-mistral
+    openai:
+      base-url: ${LM_STUDIO_URL:http://localhost:1234}
+      api-key: lm-studio
+      chat:
+        options:
+          model: mistralai/devstral-small-2-2512
+          temperature: 0.1
+
+---
+spring:
+  config:
+    activate:
+      on-profile: local-qwen3-30b
+  ai:
+    model:
+      chat: openai
+    anthropic:
+      api-key: disabled-anthropic
+    mistralai:
+      api-key: disabled-mistral
+    openai:
+      base-url: ${LM_STUDIO_URL:http://localhost:1234}
+      api-key: lm-studio
+      chat:
+        options:
+          model: qwen/qwen3-coder-30b
+          temperature: 0.1
+
+---
+spring:
+  config:
+    activate:
+      on-profile: local-glm-4-7-flash
+  ai:
+    model:
+      chat: openai
+    anthropic:
+      api-key: disabled-anthropic
+    mistralai:
+      api-key: disabled-mistral
+    openai:
+      base-url: ${LM_STUDIO_URL:http://localhost:1234}
+      api-key: lm-studio
+      chat:
+        options:
+          model: zai-org/glm-4.7-flash
+          temperature: 0.1
+          max-tokens: 16384  # GLM-4.7-Flash ist Reasoning-Modell — braucht Budget für reasoning_content + content
