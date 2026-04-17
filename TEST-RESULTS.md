@@ -1,6 +1,6 @@
 # Test-Ergebnisse
 
-> Letzte Ausführung: **17.04.2026** — rejected-locators Fix verifiziert: Mistral jetzt 6/6 auf @very-hard-navigation
+> Letzte Ausführung: **17.04.2026** — Devstral Small 2 lokal: 6/6 auf @very-hard-navigation, alle Heals im ersten Versuch
 
 ## Inhaltsverzeichnis
 
@@ -61,6 +61,17 @@ Nach dem Fix zeigt der Prompt ab Attempt 2: _"Already tried — NOT found: leg_i
 | Anthropic | 6/6 ✅ | 6/6 ✅ |
 | OpenAI | 6/6 ✅ | 6/6 ✅ |
 | Mistral | **5/6 ❌** | **6/6 ✅** |
+
+### Devstral Small 2 lokal (17.04.2026)
+
+| Provider | Tests | Build | Heals | ∅ Heal-Zeit | Tokens | Gesamtdauer |
+|---|---|---|---|---|---|---|
+| Devstral Small 2 (lokal, RTX 3090) | **6/6** | ✅ | 31 | 100 344 ms | 285 513 | 70 min 9 s |
+
+- Alle 31 Heals im **ersten Versuch** — kein Retry, keine Halluzination
+- `leg_platform` → `accessibilityId: Gleis 9` direkt korrekt (Cloud-Mistral braucht 2 Attempts)
+- `rejectedLocators`-Fix wurde nicht benötigt — Devstral halluziniert keine nicht-existenten IDs
+- ~20× langsamer als Cloud-Provider, aber kostenlos (lokale GPU)
 
 ### Fazit
 
