@@ -228,12 +228,27 @@ fun ConnectionDetailSheet(connection: Connection) {
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
                 Column {
-                    Text("${leg.trainType} ${leg.trainNumber}", fontWeight = FontWeight.Bold)
+                    // v2: train-number tag moved into the bottom sheet — in v1 it was "leg_train_number"
+                    // on the card. The self-healing benchmark targets this element for the
+                    // "very-hard-navigation" track.
+                    Text(
+                        text = "${leg.trainType} ${leg.trainNumber}",
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier
+                            .healableTestTag("leg_item_${index}_train")
+                            .semantics { contentDescription = "Zug ${leg.trainType} ${leg.trainNumber}" }
+                    )
                     Text("${leg.from} → ${leg.to}")
                 }
                 Column(horizontalAlignment = Alignment.End) {
                     Text("${leg.departure} - ${leg.arrival}")
-                    Text("Gleis ${leg.platform}", style = MaterialTheme.typography.bodySmall)
+                    Text(
+                        text = "Gleis ${leg.platform}",
+                        style = MaterialTheme.typography.bodySmall,
+                        modifier = Modifier
+                            .healableTestTag("leg_item_${index}_platform")
+                            .semantics { contentDescription = "Gleis ${leg.platform}" }
+                    )
                 }
             }
             if (index < connection.legs.size - 1) {

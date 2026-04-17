@@ -90,6 +90,11 @@ public class LocatorPromptCreator {
             sb.append(context.stepDefinitionSource()).append("\n```\n\n");
         }
 
+        if (context.additionalContext() != null && !context.additionalContext().isBlank()) {
+            sb.append("## Diagnostic Notes from MCP Enrichment\n");
+            sb.append(context.additionalContext()).append("\n\n");
+        }
+
         return sb.toString();
     }
 

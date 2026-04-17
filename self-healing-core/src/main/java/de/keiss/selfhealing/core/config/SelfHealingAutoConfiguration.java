@@ -64,10 +64,9 @@ public class SelfHealingAutoConfiguration {
     }
 
     @Bean
-    @ConditionalOnBean(ToolCallbackProvider.class)
     @ConditionalOnProperty(prefix = "self-healing.mcp", name = "enabled", havingValue = "true")
     public McpContextEnricher mcpContextEnricher(ChatClient.Builder chatClientBuilder,
-            ToolCallbackProvider mcpToolProvider) {
+            org.springframework.beans.factory.ObjectProvider<ToolCallbackProvider> mcpToolProvider) {
         return new McpContextEnricher(chatClientBuilder.build(), mcpToolProvider);
     }
 

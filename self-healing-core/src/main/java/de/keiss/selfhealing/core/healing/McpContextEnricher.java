@@ -5,6 +5,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.tool.ToolCallbackProvider;
+import org.springframework.beans.factory.ObjectProvider;
 
 /**
  * Uses the Appium MCP Server (via Spring AI MCP Client) to enrich the FailureContext with additional information before
@@ -14,24 +15,32 @@ import org.springframework.ai.tool.ToolCallbackProvider;
  * Element exploration (find similar elements nearby) - App state verification (is the right screen visible?)
  *
  * The MCP server exposes 45+ Appium tools that the LLM can use as function calls to interact with the device.
+ *
+ * Uses ObjectProvider so the ToolCallbackProvider is resolved lazily — this avoids Spring @ConditionalOnBean ordering
+ * problems where the MCP autoconfiguration bean isn't yet registered when user @Configuration classes are parsed.
  */
 @Slf4j
 @RequiredArgsConstructor
 public class McpContextEnricher {
 
     private final ChatClient chatClient;
-    private final ToolCallbackProvider mcpToolProvider;
+    private final ObjectProvider<ToolCallbackProvider> mcpToolProvider;
 
     /**
      * Enriches the failure context by asking the LLM to gather additional information via MCP tools before attempting
      * healing.
      */
     public FailureContext enrich(FailureContext context) {
+        ToolCallbackProvider provider = mcpToolProvider.getIfAvailable();
+        if (provider == null) {
+            log.warn("MCP enrichment skipped: no ToolCallbackProvider bean available (is spring-ai-starter-mcp-client configured?)");
+            return context;
+        }
         log.info("Enriching failure context via MCP...");
 
         try {
             String enrichmentResult = chatClient.prompt().system(ENRICHMENT_SYSTEM_PROMPT)
-                    .user(buildEnrichmentPrompt(context)).tools(mcpToolProvider).call().content();
+                    .user(buildEnrichmentPrompt(context)).toolCallbacks(provider).call().content();
 
             log.info("MCP enrichment complete: {}", firstLine(enrichmentResult));
 
@@ -63,11 +72,17 @@ public class McpContextEnricher {
     }
 
     private FailureContext parseEnrichmentResult(FailureContext original, String enrichmentResult) {
-        // The enrichment result is descriptive text from the LLM
-        // In a production system, we'd parse structured output from MCP tool calls
-        // For now, we append it to the step name as additional context
-        return original;
+        if (enrichmentResult == null || enrichmentResult.isBlank()) {
+            return original;
+        }
+        String trimmed = enrichmentResult.strip();
+        if (trimmed.length() > MAX_ENRICHMENT_CHARS) {
+            trimmed = trimmed.substring(0, MAX_ENRICHMENT_CHARS) + "\n...[truncated]";
+        }
+        return original.withAdditionalContext(trimmed);
     }
+
+    private static final int MAX_ENRICHMENT_CHARS = 4000;
 
     private String firstLine(String text) {
         if (text == null)

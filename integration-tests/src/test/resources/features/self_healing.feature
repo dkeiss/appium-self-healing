@@ -22,3 +22,14 @@ Feature: Self-Healing bei UI-Änderungen
     Then sehe ich mindestens 1 Verbindung
     And die erste Verbindung hat mindestens 1 Umstieg
     And der Self-Healing-Report zeigt alle geheilten Locatoren
+
+  @very-hard-navigation
+  Scenario: Fahrplan-Details hinter BottomSheet-Navigation
+    When ich "Frankfurt Hbf" als Startbahnhof eingebe
+    And ich "Köln Hbf" als Zielbahnhof eingebe
+    And ich auf Suchen klicke
+    Then sehe ich mindestens 1 Verbindung
+    When ich auf die erste Verbindung tippe
+    Then sehe ich die Zugnummer des ersten Abschnitts
+    And sehe ich das Gleis des ersten Abschnitts
+    And der Self-Healing-Report zeigt alle geheilten Locatoren

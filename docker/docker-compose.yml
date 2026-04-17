@@ -55,17 +55,9 @@ services:
     command: "TCP4-LISTEN:8080,fork,reuseaddr TCP4:backend:8080"
     restart: unless-stopped
 
-  # ─── Appium MCP Server (sidecar for healing agent) ────────────────
-  appium-mcp:
-    image: node:22-slim
-    command: >
-      sh -c "npm install -g appium-mcp@latest &&
-             appium-mcp --appium-host android-emulator --appium-port 4723"
-    depends_on:
-      android-emulator:
-        condition: service_healthy
-    profiles:
-      - mcp  # Only started when MCP enrichment is enabled
+  # NOTE: Spring AI's MCP client uses stdio transport and spawns `appium-mcp`
+  # as a subprocess of the JVM — Node.js and the MCP server are pre-installed
+  # in Dockerfile.tests, so no sidecar is needed.
 
   # ─── Self-Healing Test Runner ─────────────────────────────────────
   test-runner:
@@ -91,6 +83,10 @@ services:
     volumes:
       - ../build/reports:/app/integration-tests/build/reports
       - ../android-app/app/build/outputs/apk:/app/apks:ro
+    profiles:
+      - single-run   # only start this service when --profile single-run is given,
+                     # so that `--profile benchmark` / `--profile mcp-benchmark`
+                     # do not also spin up an unconfigured test-runner.
 
   # ─── Benchmark Runner (runs all LLM providers) ───────────────────
   benchmark-runner:
@@ -138,3 +134,80 @@ services:
         echo '=== Benchmark complete ==='
     profiles:
       - benchmark
+
+  # ─── MCP vs. no-MCP Comparison (very-hard-navigation track) ──────
+  # Runs each of the three cloud LLMs twice — once without MCP, once
+  # with — against the "@very-hard-navigation" scenario, so we can
+  # tell whether the MCP enrichment step pays for its extra tokens.
+  mcp-comparison-runner:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.tests
+    depends_on:
+      android-emulator:
+        condition: service_healthy
+      backend:
+        condition: service_healthy
+      backend-forwarder:
+        condition: service_started
+    environment:
+      APPIUM_URL: "http://android-emulator:4723"
+      BACKEND_URL: "http://backend:8080"
+      APP_APK_PATH: "/app/apks/v2/debug/app-v2-debug.apk"
+      APP_VERSION: "v2"
+      SELF_HEALING_CACHE_ENABLED: "false"
+      APPIUM_MCP_HOST: "android-emulator"
+      APPIUM_MCP_PORT: "4723"
+    env_file:
+      - .env
+    volumes:
+      - ../build/reports:/app/build/reports
+      - ../android-app/app/build/outputs/apk:/app/apks:ro
+    entrypoint:
+      - sh
+      - -c
+      - |
+        set -u
+        echo '=== MCP vs. no-MCP Comparison — very-hard-navigation ==='
+        mkdir -p /app/build/reports/mcp-comparison
+        echo '--- Warming up emulator UiAutomator2 ---'
+        sleep 90
+        for provider in anthropic openai mistral; do
+          for mcp in off on; do
+            if [ "$$mcp" = "on" ]; then
+              profiles="$$provider,mcp"
+              mcp_tag="mcp"
+            else
+              profiles="$$provider"
+              mcp_tag="nomcp"
+            fi
+            label="$$provider-$$mcp_tag"
+            track="very-hard-navigation-$$mcp_tag"
+            echo "=== RUN: $$label (profiles=$$profiles track=$$track) ==="
+            passed=0
+            for attempt in 1 2 3; do
+              echo "--- attempt $$attempt for $$label ---"
+              if SPRING_PROFILES_ACTIVE=$$profiles LLM_PROVIDER=$$provider \
+                   ./gradlew :integration-tests:test --no-daemon --rerun \
+                   -Dcucumber.filter.tags='@very-hard-navigation' \
+                   -Dbenchmark.enabled=true \
+                   -Dbenchmark.track-name=$$track \
+                   -Dbenchmark.difficulty=HARD \
+                   -Dbenchmark.output-dir=/app/build/reports/mcp-comparison 2>&1 \
+                 | tee /app/build/reports/mcp-comparison/$$label.log; then
+                echo "--- $$label PASSED on attempt $$attempt ---"
+                passed=1
+                break
+              fi
+              echo "--- $$label FAILED on attempt $$attempt ---"
+              [ $$attempt -lt 3 ] && sleep 20
+            done
+            if [ $$passed -eq 0 ]; then
+              echo "--- $$label GAVE UP after 3 attempts ---"
+            fi
+          done
+        done
+        echo '=== MCP comparison complete ==='
+        ls -la /app/build/reports/mcp-comparison/ || true
+    profiles:
+      - mcp-benchmark

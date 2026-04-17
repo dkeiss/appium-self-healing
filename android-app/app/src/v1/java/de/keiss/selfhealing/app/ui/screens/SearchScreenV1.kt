@@ -31,6 +31,8 @@ import de.keiss.selfhealing.app.ui.healableTestTag
  * - "text_transfers"     : Transfer count in result
  * - "text_price"         : Price text in result
  * - "text_no_results"    : "No results" message
+ * - "leg_train_number"   : Train number of first leg (inline in card)
+ * - "leg_platform"       : Platform of first leg (inline in card)
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -222,6 +224,30 @@ fun ConnectionItemV1(connection: Connection) {
                         onClick = {},
                         label = { Text(type) },
                         modifier = Modifier.padding(end = 4.dp)
+                    )
+                }
+            }
+
+            // First-leg details — inline in v1 (v2 hides these behind a BottomSheet)
+            connection.legs.firstOrNull()?.let { firstLeg ->
+                Spacer(modifier = Modifier.height(4.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Text(
+                        text = "${firstLeg.trainType} ${firstLeg.trainNumber}",
+                        style = MaterialTheme.typography.bodySmall,
+                        modifier = Modifier
+                            .healableTestTag("leg_train_number")
+                            .semantics { contentDescription = "Zug ${firstLeg.trainType} ${firstLeg.trainNumber}" }
+                    )
+                    Text(
+                        text = "Gleis ${firstLeg.platform}",
+                        style = MaterialTheme.typography.bodySmall,
+                        modifier = Modifier
+                            .healableTestTag("leg_platform")
+                            .semantics { contentDescription = "Gleis ${firstLeg.platform}" }
                     )
                 }
             }
