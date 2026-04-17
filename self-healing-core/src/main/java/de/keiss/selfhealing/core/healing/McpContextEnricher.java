@@ -97,9 +97,11 @@ public class McpContextEnricher {
 
             You have access to Appium MCP tools. Use them to:
             1. Take a screenshot (appium_screenshot)
-            2. Get the page source (appium_source)
-            3. Find elements on the current screen (appium_find_element, appium_find_elements)
+            2. Get the page source (appium_get_page_source)
+            3. Find a single element on the current screen (appium_find_element)
 
+            Use ONLY the exact tool names listed above. Do NOT invent variants like
+            "appium_source" or "appium_find_elements" — they do not exist.
             Report your findings concisely. Do NOT attempt to fix anything.
             """;
 }

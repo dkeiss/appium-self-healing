@@ -19,3 +19,8 @@ spring:
     active: ${SPRING_PROFILES_ACTIVE:anthropic},selfhealing
   config:
     import: classpath:application-selfhealing.yml
+  ai:
+    retry:
+      # Treat HTTP 429 (rate limit) as transient so Spring AI retries with backoff
+      # instead of throwing NonTransientAiException immediately.
+      on-http-codes: [429]
