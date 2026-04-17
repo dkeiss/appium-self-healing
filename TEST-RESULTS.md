@@ -1,6 +1,6 @@
 # Test-Ergebnisse
 
-> Letzte Ausführung: **17.04.2026** — MCP vs. no-MCP Benchmark (alle 3 Cloud-Provider, @very-hard-navigation, 6 Runs)
+> Letzte Ausführung: **17.04.2026** — rejected-locators Fix verifiziert: Mistral jetzt 6/6 auf @very-hard-navigation
 
 ## Inhaltsverzeichnis
 
@@ -35,10 +35,10 @@
 | Anthropic (claude-sonnet-4-6) | ✓ | **6/6** | ✅ | 23 min 40 s | 31 | 15 656 ms | 332 491 |
 | OpenAI (gpt-4.1) | ✗ | **6/6** | ✅ |  9 min 54 s | 31 |  5 265 ms | 254 565 |
 | OpenAI (gpt-4.1) | ✓ | **6/6** | ✅ | 23 min 11 s | 31 | 20 400 ms | 256 917 |
-| Mistral (codestral-latest) | ✗ | **5/6** | ❌ |  9 min 27 s | 36 |  3 775 ms | 301 450 |
+| Mistral (codestral-latest) | ✗ | **5/6** | ❌ |  9 min 27 s | 36 |  3 775 ms | 301 450 | ¹ |
 | Mistral (codestral-latest) | ✓ | **6/6** | ✅ |  9 min 37 s | 31 |  4 079 ms | 287 653 |
 
-> Mistral+nomcp scheitert konsistent am `leg_platform`-Locator (BottomSheet-Kontext). Alle anderen Runs: ✅.
+> ¹ Mistral+nomcp scheiterte ursprünglich am `leg_platform`-Locator — behoben durch `rejectedLocators`-Fix (siehe unten).
 
 ### Abgesicherte nomcp-Baseline (Rerun 17.04.2026)
 
@@ -49,6 +49,18 @@
 | Mistral | **5/6** | ❌ | 36 |  3 653 ms |
 
 Alle nomcp-Runs stabil — Fixes (HTTP-429-Retry-Config, Prompt-Korrektur) brechen nichts.
+
+### rejected-locators Fix (17.04.2026)
+
+`FailureContext` trackt jetzt fehlgeschlagene Heal-Vorschläge über Retries hinweg.
+Mistral erfand bei Attempt 1 `leg_item_0_platform` (existiert nicht) und wiederholte es in Attempt 2+3, weil der Kontext den Original-Locator durch den fehlgeschlagenen Vorschlag ersetzte.
+Nach dem Fix zeigt der Prompt ab Attempt 2: _"Already tried — NOT found: leg_item_0_platform"_ und Mistral schlägt `accessibilityId: Gleis 9` vor.
+
+| Provider | Tests (vor Fix) | Tests (nach Fix) |
+|---|---|---|
+| Anthropic | 6/6 ✅ | 6/6 ✅ |
+| OpenAI | 6/6 ✅ | 6/6 ✅ |
+| Mistral | **5/6 ❌** | **6/6 ✅** |
 
 ### Fazit
 

@@ -104,6 +104,7 @@ Die Fixes haben die Crashes beseitigt, aber den Kernmangel nicht behoben: MCP-En
 | 1 | `NonTransientAiException` nach MCP-Enrichment | ✅ **Behoben** | `spring.ai.retry.on-http-codes: [429]` |
 | 2 | `No ToolCallback found: appium_find_elements` | ✅ **Behoben** | Prompt auf exakte Tool-Namen eingeschränkt |
 | 3 | MCP-Enrichment hängt am "No driver found"-Loop | ⚠️ **Offen** | Architekturproblem: Session-Sharing nötig |
+| 4 | Mistral wiederholt dieselbe halluzinierte ID bei Retries | ✅ **Behoben** | `rejectedLocators` in `FailureContext` — Attempt 2 sieht verbotene Vorschläge |
 
 ---
 
@@ -124,7 +125,7 @@ Die Fixes haben die Crashes beseitigt, aber den Kernmangel nicht behoben: MCP-En
 
 ---
 
-## 7. Baseline-Vergleich (ohne MCP, nur LLM-Qualität)
+## 7. Baseline-Vergleich (ohne MCP, ohne rejected-locators-Fix)
 
 | Provider | Success-Rate | ∅ Heal-Zeit | Kosten/Run |
 |---|---|---|---|
@@ -136,7 +137,28 @@ Beim `@very-hard-navigation`-Szenario scheitert Mistral/Codestral konsistent an 
 
 ---
 
-## 8. Vergleich Run 1 vs. Run 2
+## 8. Rejected-Locators Fix — Verification Run (17.04.2026)
+
+Nach dem Commit `rejectedLocators` wurden alle 3 Provider erneut ohne MCP getestet:
+
+| Provider | Tests | Build | Heals | ∅ Heal-Zeit | Tokens |
+|---|---|---|---|---|---|
+| Anthropic | **6/6** | ✅ | 31 | 12 219 ms | 313 479 |
+| OpenAI | **6/6** | ✅ | 31 |  5 618 ms | 254 615 |
+| Mistral | **6/6** | ✅ | 33 |  3 780 ms | 292 285 |
+
+**Mistral `leg_platform` — Verlauf nach Fix:**
+```
+Attempt 1: By.id: leg_platform → By.id: leg_item_0_platform  ← nicht gefunden (halluziniert)
+           [rejectedLocators: leg_item_0_platform] → Prompt für Attempt 2 enthält Verbot
+Attempt 2: By.id: leg_platform → AppiumBy.accessibilityId: Gleis 9  ← SUCCESS ✅
+```
+
+Mistral ist jetzt **100 % (6/6)** — erstmals ohne MCP.
+
+---
+
+## 9. Vergleich Run 1 vs. Run 2
 
 | Provider + MCP | Run 1 | Run 2 | Δ |
 |---|---|---|---|
