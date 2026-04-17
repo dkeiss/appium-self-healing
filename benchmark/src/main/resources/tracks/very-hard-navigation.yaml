@@ -1,0 +1,43 @@
+name: "Sehr schwierige Navigation"
+description: "Zielelement liegt in v2 hinter einer Geste — Tap auf JourneyCard öffnet ein ModalBottomSheet, und die Detail-Locatoren (Zugnummer, Gleis) sind erst danach im DOM. Testet, ob der Self-Healer nach Navigation in neuem Context findet."
+appVersion: "v2"
+difficulty: HARD
+
+scenarios:
+  - feature: "self_healing.feature"
+    scenario: "Fahrplan-Details hinter BottomSheet-Navigation"
+    expectedHealings: 6
+    maxHealingTimeMs: 60000
+    brokenLocators:
+      - original: "input_from"
+        expected: "departure_station"
+        type: ID_RENAME
+        description: "Search field rename (same screen)"
+      - original: "input_to"
+        expected: "arrival_station"
+        type: ID_RENAME
+        description: "Search field rename (same screen)"
+      - original: "btn_search"
+        expected: "fab_search"
+        type: WIDGET_TYPE_CHANGE
+        description: "Button → FloatingActionButton on the search screen"
+      - original: "connection_item"
+        expected: "journey_card"
+        type: NAVIGATION_CHANGE
+        description: "Result card renamed and now opens a BottomSheet on tap"
+      - original: "leg_train_number"
+        expected: "leg_item_0_train"
+        type: NAVIGATION_CHANGE
+        description: "Train number for first leg was inline in v1 card, now only inside the BottomSheet that opens after tap"
+      - original: "leg_platform"
+        expected: "leg_item_0_platform"
+        type: NAVIGATION_CHANGE
+        description: "Platform for first leg was inline in v1 card, now only inside the BottomSheet that opens after tap"
+
+metrics:
+  - healing_success_rate
+  - avg_healing_time_ms
+  - total_llm_tokens
+  - total_llm_cost_usd
+  - false_positive_rate
+  - step_healing_count

@@ -10,6 +10,7 @@ dependencies {
     implementation("org.springframework.ai:spring-ai-starter-model-anthropic")
     implementation("org.springframework.ai:spring-ai-starter-model-openai")
     implementation("org.springframework.ai:spring-ai-starter-model-mistral-ai")
+    implementation("org.springframework.ai:spring-ai-starter-mcp-client")
 
     implementation("io.appium:java-client:$appiumVersion")
     implementation("org.jsoup:jsoup:1.22.1")

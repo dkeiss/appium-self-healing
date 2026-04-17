@@ -1,9 +1,10 @@
 # Test-Ergebnisse
 
-> Letzte Ausführung: **16.04.2026** — dritter lokaler Lauf mit GLM-4.7-Flash (Reasoning-Modell, via LM Studio), 0/5 PASSED
+> Letzte Ausführung: **17.04.2026** — MCP vs. no-MCP Benchmark (alle 3 Cloud-Provider, @very-hard-navigation, 6 Runs)
 
 ## Inhaltsverzeichnis
 
+- [MCP vs. no-MCP Benchmark](#mcp-vs-no-mcp-benchmark)
 - [Zusammenfassung](#zusammenfassung)
 - [Test-Runs im Detail](#test-runs-im-detail)
   - [v1 Baseline (Anthropic)](#v1-baseline-anthropic)
@@ -18,6 +19,43 @@
 - [verify-fix.sh Validierung](#verify-fixsh-validierung)
 - [Cucumber Reports](#cucumber-reports)
 - [Highlight-Feature (Rote Markierung)](#highlight-feature-rote-markierung)
+
+---
+
+## MCP vs. no-MCP Benchmark
+
+> Track: `@very-hard-navigation` · App v2 · Cache disabled · 2 Runs/Provider (nomcp + mcp)
+> Detailbericht: [docs/mcp-comparison-report.md](docs/mcp-comparison-report.md)
+
+### Ergebnisübersicht
+
+| Provider | MCP | Tests | Build | Gesamtdauer | Heals | ∅ Heal-Zeit | Tokens |
+|---|---|---|---|---|---|---|---|
+| Anthropic (claude-sonnet-4-6) | ✗ | **6/6** | ✅ | 14 min 48 s | 31 | 12 085 ms | 313 133 |
+| Anthropic (claude-sonnet-4-6) | ✓ | **6/6** | ✅ | 23 min 40 s | 31 | 15 656 ms | 332 491 |
+| OpenAI (gpt-4.1) | ✗ | **6/6** | ✅ |  9 min 54 s | 31 |  5 265 ms | 254 565 |
+| OpenAI (gpt-4.1) | ✓ | **6/6** | ✅ | 23 min 11 s | 31 | 20 400 ms | 256 917 |
+| Mistral (codestral-latest) | ✗ | **5/6** | ❌ |  9 min 27 s | 36 |  3 775 ms | 301 450 |
+| Mistral (codestral-latest) | ✓ | **6/6** | ✅ |  9 min 37 s | 31 |  4 079 ms | 287 653 |
+
+> Mistral+nomcp scheitert konsistent am `leg_platform`-Locator (BottomSheet-Kontext). Alle anderen Runs: ✅.
+
+### Abgesicherte nomcp-Baseline (Rerun 17.04.2026)
+
+| Provider | Tests | Build | Heals | ∅ Heal-Zeit |
+|---|---|---|---|---|
+| Anthropic | **6/6** | ✅ | 33 | 12 300 ms |
+| OpenAI | **6/6** | ✅ | 31 |  5 277 ms |
+| Mistral | **5/6** | ❌ | 36 |  3 653 ms |
+
+Alle nomcp-Runs stabil — Fixes (HTTP-429-Retry-Config, Prompt-Korrektur) brechen nichts.
+
+### Fazit
+
+- **MCP liefert keinen Mehrwert** unter den aktuellen Bedingungen: `appium-mcp` kann die laufende Appium-Session nicht nutzen, jeder Tool-Call gibt "No driver found" zurück.
+- **MCP ist stabil** (nach den Fixes): kein `NonTransientAiException` bei OpenAI, kein Tool-Dispatch-Fehler bei Mistral.
+- **Overhead:** Anthropic +9 min/Run, OpenAI +13 min/Run, Mistral <1 min/Run.
+- `self-healing.mcp.enabled` bleibt `false` (Default). MCP-Profil-Support bleibt für künftige Session-Sharing-Experimente erhalten.
 
 ---
 

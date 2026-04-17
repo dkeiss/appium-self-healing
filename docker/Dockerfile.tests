@@ -1,6 +1,32 @@
+# Pull Node.js + the Appium MCP server from the official Node image. We do this
+# as a separate stage so we don't depend on Ubuntu apt mirrors inside the JDK
+# image (archive.ubuntu.com is often unreachable from this build host).
+FROM node:22-bookworm-slim AS node-stage
+RUN npm install -g appium-mcp@latest
+
 FROM eclipse-temurin:25-jdk
 
 WORKDIR /app
+
+# Copy the Node runtime and the globally-installed appium-mcp CLI out of the
+# node stage. Spring AI's stdio MCP client spawns `appium-mcp` as a subprocess
+# of the JVM, so both Node and the CLI must be on PATH inside this image.
+COPY --from=node-stage /usr/local/bin/node /usr/local/bin/node
+COPY --from=node-stage /usr/local/lib/node_modules /usr/local/lib/node_modules
+# Recreate the symlinks npm installs into /usr/local/bin (COPY doesn't carry
+# them across stages reliably).
+RUN set -eux; \
+    ln -sf /usr/local/lib/node_modules/npm/bin/npm-cli.js /usr/local/bin/npm; \
+    ln -sf /usr/local/lib/node_modules/npm/bin/npx-cli.js /usr/local/bin/npx; \
+    for b in /usr/local/lib/node_modules/appium-mcp/bin/*.js \
+             /usr/local/lib/node_modules/appium-mcp/dist/index.js \
+             /usr/local/lib/node_modules/appium-mcp/index.js; do \
+        [ -f "$b" ] && ln -sf "$b" /usr/local/bin/appium-mcp && break; \
+    done; \
+    chmod +x /usr/local/bin/appium-mcp || true; \
+    node --version; npm --version; \
+    which appium-mcp; \
+    appium-mcp --help >/dev/null 2>&1 || true
 
 # Copy Gradle wrapper and build config
 COPY gradlew settings.gradle.kts build.gradle.kts gradle.properties ./

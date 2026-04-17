@@ -45,9 +45,12 @@ spring:
         stdio:
           connections:
             appium-mcp:
-              command: npx
+              command: appium-mcp
               args:
-                - appium-mcp@latest
+                - --appium-host
+                - ${APPIUM_MCP_HOST:android-emulator}
+                - --appium-port
+                - ${APPIUM_MCP_PORT:4723}
 
 self-healing:
   mcp:
