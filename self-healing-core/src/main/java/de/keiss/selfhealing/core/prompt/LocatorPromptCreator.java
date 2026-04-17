@@ -77,6 +77,17 @@ public class LocatorPromptCreator {
         sb.append("## Broken Locator\n");
         sb.append(context.failedLocator().toString()).append("\n\n");
 
+        if (context.rejectedLocators() != null && !context.rejectedLocators().isEmpty()) {
+            sb.append("## Already Tried — DO NOT Suggest Again\n");
+            sb.append("The following locators were proposed in previous attempts but could NOT be found in the UI.\n");
+            sb.append("They are either invented or no longer exist. Suggest something different that appears\n");
+            sb.append("**verbatim** in the XML page source below:\n");
+            for (var rejected : context.rejectedLocators()) {
+                sb.append("- `").append(rejected.toString()).append("`\n");
+            }
+            sb.append("\n");
+        }
+
         if (context.pageSourceXml() != null) {
             sb.append("## Current Page Source (Appium XML)\n```xml\n");
             sb.append(smartTruncateXml(context.pageSourceXml(), 15000)).append("\n```\n\n");
