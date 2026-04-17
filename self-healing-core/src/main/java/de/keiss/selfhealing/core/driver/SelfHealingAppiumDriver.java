@@ -107,8 +107,9 @@ public class SelfHealingAppiumDriver {
                     return element;
                 } catch (NoSuchElementException retryFail) {
                     log.warn("Healed locator also failed: {} — retrying...", result.healedLocator());
-                    // Update context for next attempt
-                    context = buildContext(result.healedLocator(), retryFail);
+                    // Keep original failedLocator, record rejected heal so the next attempt
+                    // does not repeat the same non-existent suggestion.
+                    context = context.withRejectedLocator(result.healedLocator());
                 }
             } else {
                 log.warn("Healing returned no usable locator: {}", result.explanation());
