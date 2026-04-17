@@ -158,7 +158,41 @@ Mistral ist jetzt **100 % (6/6)** — erstmals ohne MCP.
 
 ---
 
-## 9. Vergleich Run 1 vs. Run 2
+## 9. Devstral Small 2 lokal — @very-hard-navigation (17.04.2026)
+
+| Metrik | Wert |
+|---|---|
+| Build | ✅ SUCCESSFUL · **6/6** |
+| Heals | 31 · alle in Attempt 1 |
+| ∅ Heal-Zeit | 100 344 ms (~100 s/Heal auf RTX 3090) |
+| Tokens | 91 409 Triage + 194 104 Locator = **285 513** |
+| Gesamtdauer | 70 min 9 s |
+| Kosten | ~$0 (lokale GPU) |
+
+**Geheilte Locatoren (Auswahl):**
+
+| v1-Locator | Geheilt zu | Attempt |
+|---|---|---|
+| `leg_platform` | `AppiumBy.accessibilityId: Gleis 9` | **1** |
+| `leg_train_number` | `AppiumBy.accessibilityId: Zug ICE ICE 123` | **1** |
+| `input_from` / `input_to` | `departure_station` / `arrival_station` | **1** |
+| `text_from` / `text_to` | `label_departure` / `label_arrival` | **1** |
+| `btn_search` | `AppiumBy.accessibilityId: Suche starten` | **1** |
+
+Kein einziger Retry, keine Halluzination. Devstral heilt `leg_platform` direkt korrekt — Cloud-Mistral (Codestral) braucht dafür den `rejectedLocators`-Fix und zwei Attempts.
+
+**Einordnung gegenüber Cloud-Providern:**
+
+| Provider | Tests | ∅ Heal-Zeit | Kosten/Run | Heals Attempt 1 |
+|---|---|---|---|---|
+| Anthropic claude-sonnet-4-6 | 6/6 ✅ | 12 219 ms | ~$1.50 | 31/31 |
+| OpenAI gpt-4.1 | 6/6 ✅ | 5 618 ms | ~$0.82 | 31/31 |
+| Mistral codestral-latest | 6/6 ✅ | 3 780 ms | ~$0.12 | 30/31 |
+| **Devstral Small 2 (lokal)** | **6/6 ✅** | **100 344 ms** | **~$0** | **31/31** |
+
+---
+
+## 10. Vergleich Run 1 vs. Run 2
 
 | Provider + MCP | Run 1 | Run 2 | Δ |
 |---|---|---|---|
