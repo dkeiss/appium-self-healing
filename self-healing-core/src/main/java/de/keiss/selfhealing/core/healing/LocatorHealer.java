@@ -13,6 +13,8 @@ import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.metadata.ChatResponseMetadata;
 import org.springframework.ai.chat.metadata.Usage;
 import org.springframework.ai.chat.model.ChatResponse;
+import org.springframework.ai.content.Media;
+import org.springframework.util.MimeTypeUtils;
 
 import java.lang.reflect.Method;
 
@@ -31,9 +33,20 @@ public class LocatorHealer {
 
         try {
             var promptCreator = new LocatorPromptCreator();
+            boolean useVision = properties.vision().enabled() && context.screenshot() != null
+                    && context.screenshot().length > 0;
+            String userPrompt = promptCreator.createUserPrompt(context, useVision);
 
-            ChatResponse chatResponse = chatClient.prompt().system(promptCreator.createSystemPrompt())
-                    .user(promptCreator.createUserPrompt(context)).call().chatResponse();
+            var requestSpec = chatClient.prompt().system(promptCreator.createSystemPrompt());
+            if (useVision) {
+                Media screenshot = Media.builder().mimeType(MimeTypeUtils.IMAGE_PNG).data(context.screenshot()).build();
+                log.info("Vision mode: attaching {} byte screenshot to heal prompt", context.screenshot().length);
+                requestSpec = requestSpec.user(spec -> spec.text(userPrompt).media(screenshot));
+            } else {
+                requestSpec = requestSpec.user(userPrompt);
+            }
+
+            ChatResponse chatResponse = requestSpec.call().chatResponse();
 
             // Extract token usage and cache metrics
             int totalTokens = logTokenUsage(chatResponse);

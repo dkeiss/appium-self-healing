@@ -7,6 +7,7 @@ import de.keiss.selfhealing.core.config.SelfHealingProperties.Cache;
 import de.keiss.selfhealing.core.config.SelfHealingProperties.EnvironmentCheck;
 import de.keiss.selfhealing.core.config.SelfHealingProperties.Mcp;
 import de.keiss.selfhealing.core.config.SelfHealingProperties.Triage;
+import de.keiss.selfhealing.core.config.SelfHealingProperties.Vision;
 import de.keiss.selfhealing.core.model.FailureContext;
 import de.keiss.selfhealing.core.model.HealingResult;
 import de.keiss.selfhealing.core.model.TriageResult;
@@ -118,7 +119,7 @@ class HealingOrchestratorTest {
 
     private static SelfHealingProperties propertiesWithCache(boolean cacheEnabled) {
         return new SelfHealingProperties(true, 3, "anthropic", null, new Triage(true), new Mcp(false),
-                new Cache(cacheEnabled), EnvironmentCheck.defaults(), BugReports.defaults(), null);
+                new Vision(false), new Cache(cacheEnabled), EnvironmentCheck.defaults(), BugReports.defaults(), null);
     }
 
     private static FailureContext failureContextForLocator(By locator) {

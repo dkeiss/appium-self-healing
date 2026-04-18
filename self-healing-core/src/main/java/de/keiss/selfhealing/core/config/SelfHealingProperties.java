@@ -4,7 +4,8 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 
 @ConfigurationProperties(prefix = "self-healing")
 public record SelfHealingProperties(boolean enabled, int maxRetries, String llmProvider, String sourceBasePath,
-        Triage triage, Mcp mcp, Cache cache, EnvironmentCheck environmentCheck, BugReports bugReports, GitPr gitPr) {
+        Triage triage, Mcp mcp, Vision vision, Cache cache, EnvironmentCheck environmentCheck, BugReports bugReports,
+        GitPr gitPr) {
 
     public SelfHealingProperties {
         if (maxRetries <= 0)
@@ -15,6 +16,8 @@ public record SelfHealingProperties(boolean enabled, int maxRetries, String llmP
             triage = new Triage(true);
         if (mcp == null)
             mcp = new Mcp(false);
+        if (vision == null)
+            vision = new Vision(false);
         if (cache == null)
             cache = Cache.defaults();
         if (environmentCheck == null)
@@ -29,6 +32,14 @@ public record SelfHealingProperties(boolean enabled, int maxRetries, String llmP
     }
 
     public record Mcp(boolean enabled) {
+    }
+
+    /**
+     * When enabled, the LocatorHealer attaches the failure screenshot (PNG) to the LLM prompt as a multimodal
+     * input. Only useful with vision-capable providers (Claude Sonnet, GPT-4o, Qwen3-VL). Default off so non-vision
+     * providers (Devstral, GLM-Flash) keep working unchanged.
+     */
+    public record Vision(boolean enabled) {
     }
 
     /**
