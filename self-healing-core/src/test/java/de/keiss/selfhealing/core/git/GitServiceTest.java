@@ -55,7 +55,7 @@ class GitServiceTest {
             git.push().setRemote("origin").call();
         }
 
-        config = new SelfHealingProperties.GitPr(true, "origin", "main", "fix/self-healing-", "dummy-token",
+        config = new SelfHealingProperties.GitPr(true, false, "origin", "main", "fix/self-healing-", "dummy-token",
                 "test-owner", "test-repo");
     }
 
@@ -109,6 +109,29 @@ class GitServiceTest {
             Path written = repoDir.resolve("src/test/java").resolve(packagePath);
             assertThat(written).exists().hasContent(fixedSource);
         }
+    }
+
+    @Test
+    void commitAndPush_dryRun_doesNotTouchRepo() throws IOException, GitAPIException {
+        var dryRunConfig = new SelfHealingProperties.GitPr(true, true, "origin", "main", "fix/self-healing-",
+                "dummy-token", "test-owner", "test-repo");
+        var gitService = new GitService(repoDir, dryRunConfig);
+
+        String branchName = gitService.commitAndPush("SearchPage", "de/keiss/SearchPage.java",
+                "package de.keiss;\npublic class SearchPage {}", "fix: dry run");
+
+        assertThat(branchName).startsWith("fix/self-healing-SearchPage-");
+
+        // No fix branch should exist locally or on the remote, and no file should be written.
+        try (Git localGit = Git.open(repoDir.toFile())) {
+            assertThat(localGit.branchList().call()).noneMatch(r -> r.getName().contains("fix/self-healing-"));
+            assertThat(localGit.getRepository().getBranch()).isEqualTo("main");
+        }
+        Path remoteDir = tempDir.resolve("remote.git");
+        try (Git remoteGit = Git.open(remoteDir.toFile())) {
+            assertThat(remoteGit.branchList().call()).noneMatch(r -> r.getName().contains("fix/self-healing-"));
+        }
+        assertThat(repoDir.resolve("src/test/java/de/keiss/SearchPage.java")).doesNotExist();
     }
 
     @Test

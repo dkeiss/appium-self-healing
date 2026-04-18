@@ -59,9 +59,10 @@ public class SourceCodeResolver {
             log.warn("Could not read source file: {}", filePath, e);
         }
 
-        // Try common test source paths
-        for (String prefix : new String[]{"src/test/java/", "src/main/java/"}) {
-            Path alternate = sourceBasePath.resolve(prefix).resolve(relativePath);
+        // Try common source roots — both at the base and one level deep (for multi-module projects
+        // where page objects live in a submodule like integration-tests/src/test/java/).
+        for (String root : candidateRoots()) {
+            Path alternate = sourceBasePath.resolve(root).resolve(relativePath);
             try {
                 if (Files.exists(alternate)) {
                     return Files.readString(alternate);
@@ -73,6 +74,32 @@ public class SourceCodeResolver {
 
         log.debug("Source file not found for class: {}", className);
         return null;
+    }
+
+    /**
+     * Returns source root candidates to probe: the standard roots directly under sourceBasePath, plus the same roots
+     * one level deep to support multi-module projects (e.g. integration-tests/src/test/java/).
+     */
+    private String[] candidateRoots() {
+        String[] standard = {"src/test/java/", "src/main/java/"};
+
+        // Collect immediate subdirectory names (submodules like "integration-tests", "backend", ...)
+        try {
+            var submodulePrefixes = Files.list(sourceBasePath)
+                    .filter(Files::isDirectory)
+                    .map(p -> p.getFileName().toString())
+                    .filter(name -> !name.startsWith(".") && !name.equals("build"))
+                    .flatMap(sub -> java.util.Arrays.stream(standard).map(root -> sub + "/" + root))
+                    .toArray(String[]::new);
+
+            String[] all = new String[standard.length + submodulePrefixes.length];
+            System.arraycopy(standard, 0, all, 0, standard.length);
+            System.arraycopy(submodulePrefixes, 0, all, standard.length, submodulePrefixes.length);
+            return all;
+        } catch (IOException e) {
+            log.debug("Could not list subdirectories of {}: {}", sourceBasePath, e.getMessage());
+            return standard;
+        }
     }
 
     public record CallerInfo(String pageObjectSource, String pageObjectClassName, String stepDefinitionSource,

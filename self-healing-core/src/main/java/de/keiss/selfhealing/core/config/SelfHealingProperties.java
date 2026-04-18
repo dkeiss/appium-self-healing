@@ -74,10 +74,11 @@ public record SelfHealingProperties(boolean enabled, int maxRetries, String llmP
 
     /**
      * Configuration for automatic PR creation when a locator is healed. Disabled by default — opt-in via
-     * {@code self-healing.git-pr.enabled=true}.
+     * {@code self-healing.git-pr.enabled=true}. When {@code dryRun=true}, the pipeline logs the full PR plan (branch,
+     * commit, body) without touching git or calling the GitHub API.
      */
-    public record GitPr(boolean enabled, String remoteName, String baseBranch, String branchPrefix, String githubToken,
-            String githubRepoOwner, String githubRepoName) {
+    public record GitPr(boolean enabled, boolean dryRun, String remoteName, String baseBranch, String branchPrefix,
+            String githubToken, String githubRepoOwner, String githubRepoName) {
 
         public GitPr {
             if (remoteName == null || remoteName.isBlank())
@@ -89,7 +90,7 @@ public record SelfHealingProperties(boolean enabled, int maxRetries, String llmP
         }
 
         public static GitPr defaults() {
-            return new GitPr(false, "origin", "main", "fix/self-healing-", null, null, null);
+            return new GitPr(false, false, "origin", "main", "fix/self-healing-", null, null, null);
         }
     }
 }
