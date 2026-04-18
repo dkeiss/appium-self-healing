@@ -782,6 +782,36 @@ LLM_PROVIDER=openai ./run-tests.sh v2
 LLM_PROVIDER=local ./run-tests.sh v2
 ```
 
+### PR-Erstellung für geheilte Locatoren
+
+Wenn ein Locator-Heal erfolgreich war, kann der Self-Healing-Agent automatisch einen Fix-Branch + GitHub-PR mit dem reparierten Page-Object öffnen. Workflow:
+
+1. `HealingResult` mit fixedSource → `AutoFixPrCreator` (`@EventListener`)
+2. `GitService` (JGit): Branch `fix/self-healing-<PageClass>-<timestamp>` aus `base-branch`, schreibt Datei, commit, push
+3. `GitHubPrService` (kohsuke/github-api): öffnet PR mit strukturiertem Body (Original- + Healed-Locator, Reason, Provider, Scenario)
+
+**Dry-Run-Modus** (`SELF_HEALING_GIT_PR_DRY_RUN=true`): logt Branch-Name, Commit-Message, PR-Body und liefert eine `dry-run://...`-URL — ohne JGit/GitHub-API-Aufruf. Empfohlen für die Erstverifikation neuer Provider/Modelle.
+
+#### Env-Vars
+
+```bash
+SELF_HEALING_GIT_PR_ENABLED=true
+SELF_HEALING_GIT_PR_DRY_RUN=true            # erst false, wenn dry-run sauber durchläuft
+SELF_HEALING_GIT_PR_BASE_BRANCH=self-healing-playground
+SELF_HEALING_SOURCE_BASE_PATH=<git-root>    # Git-Root, NICHT das Submodul-Verzeichnis
+GITHUB_TOKEN=<personal-access-token>        # repo-scope
+GITHUB_REPO_OWNER=dkeiss
+GITHUB_REPO_NAME=appium-self-healing
+SPRING_PROFILES_ACTIVE=anthropic,selfhealing # oder local-devstral,selfhealing
+```
+
+#### Stolperfallen
+
+- **`SPRING_PROFILES_ACTIVE` muss als Env-Var gesetzt werden**, nicht als `-Dspring.profiles.active`. [integration-tests/src/test/resources/application.yml](integration-tests/src/test/resources/application.yml) referenziert `${SPRING_PROFILES_ACTIVE:anthropic}` — der `-D`-Flag erreicht den Test-Fork nicht.
+- **`SELF_HEALING_SOURCE_BASE_PATH` muss auf das Git-Root zeigen**, nicht auf das Submodul (`integration-tests`). JGit würde sonst versuchen, das Submodul-Verzeichnis als Repo zu öffnen und mit `repository not found` scheitern. [SourceCodeResolver](self-healing-core/src/main/java/de/keiss/selfhealing/core/driver/SourceCodeResolver.java) und [GitService](self-healing-core/src/main/java/de/keiss/selfhealing/core/git/GitService.java) probieren `<sub>/src/test/java/` und `<sub>/src/main/java/` automatisch ab.
+- **Triage** ruft das LLM ebenfalls auf. Bei lokalen Modellen (Devstral) sollte `selfhealing.triage.enabled=false` gesetzt oder ein Anthropic-Dummy-Key gestellt werden, sonst schlägt die Triage-Stufe vor dem Heal fehl.
+- **Verifiziert mit** Anthropic Claude Sonnet sowie lokalem Devstral Small 2 (LM Studio, OpenAI-kompatibel).
+
 ### Docker-Services
 
 | Service | Port | Beschreibung |
@@ -800,7 +830,8 @@ LLM_PROVIDER=local ./run-tests.sh v2
 - [x] **Phase 2**: App v2, Prompt-Optimierung, StepHealer, MCP-Integration, Benchmark
 - [x] **Phase 3**: Root-Cause-Analyse (EnvironmentChecker, AppBugReporter)
 - [x] **Phase 4**: Benchmark-Automatisierung (vollständiger LLM-Vergleich)
-- [ ] **Phase 5**: iOS, PR-Erstellung, Vision-Models, A2A-Integration
+- [x] **Phase 5 (teilweise)**: PR-Erstellung für geheilte Locatoren inkl. Dry-Run (Anthropic + lokaler Devstral verifiziert)
+- [ ] **Phase 5 (offen)**: iOS, Vision-Models, A2A-Integration
 
 ---
 

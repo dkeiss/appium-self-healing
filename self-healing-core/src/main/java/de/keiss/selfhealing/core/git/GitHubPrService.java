@@ -38,13 +38,20 @@ public class GitHubPrService {
      */
     public String createPullRequest(String branchName, String pageObjectClassName, String originalLocator,
             HealingResult healingResult, String scenarioName, String llmProvider) throws IOException {
-        GitHub github = new GitHubBuilder().withOAuthToken(config.githubToken()).build();
-
-        String repoFullName = config.githubRepoOwner() + "/" + config.githubRepoName();
-        GHRepository repo = github.getRepository(repoFullName);
-
         String title = "fix: Self-Healing " + pageObjectClassName;
         String body = buildPrBody(pageObjectClassName, originalLocator, healingResult, scenarioName, llmProvider);
+
+        if (config.dryRun()) {
+            String repoFullName = config.githubRepoOwner() + "/" + config.githubRepoName();
+            String dryRunUrl = "dry-run://" + repoFullName + "/pulls?head=" + branchName + "&base=" + config.baseBranch();
+            log.info("[DRY-RUN] Would open PR on {}: {} ({} → {})\nTitle: {}\nBody:\n{}", repoFullName, dryRunUrl,
+                    branchName, config.baseBranch(), title, body);
+            return dryRunUrl;
+        }
+
+        GitHub github = new GitHubBuilder().withOAuthToken(config.githubToken()).build();
+        String repoFullName = config.githubRepoOwner() + "/" + config.githubRepoName();
+        GHRepository repo = github.getRepository(repoFullName);
 
         var pr = repo.createPullRequest(title, branchName, config.baseBranch(), body);
 

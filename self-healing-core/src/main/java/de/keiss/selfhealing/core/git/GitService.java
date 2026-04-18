@@ -44,6 +44,13 @@ public class GitService {
             String commitMessage) throws IOException, GitAPIException {
         String branchName = buildBranchName(pageObjectClassName);
 
+        if (config.dryRun()) {
+            String repoRelativePath = resolveRepoRelativePath(packageFilePath);
+            log.info("[DRY-RUN] Would create branch '{}' from '{}' and commit {} ({} chars) with message:\n{}",
+                    branchName, config.baseBranch(), repoRelativePath, fixedSource.length(), commitMessage);
+            return branchName;
+        }
+
         try (Git git = Git.open(repoPath.toFile())) {
             // Ensure we start from the latest base branch state
             git.checkout().setName(config.baseBranch()).call();
@@ -84,17 +91,38 @@ public class GitService {
 
     /**
      * Resolves a package-relative file path (e.g. "de/keiss/SearchPage.java") to a repo-relative path (e.g.
-     * "src/test/java/de/keiss/SearchPage.java") by probing common source roots.
+     * "integration-tests/src/test/java/de/keiss/SearchPage.java") by probing common source roots, including one level
+     * of submodule directories for multi-module projects.
      */
     String resolveRepoRelativePath(String packageFilePath) {
-        for (String srcRoot : new String[]{"src/test/java/", "src/main/java/"}) {
+        for (String srcRoot : candidateSourceRoots()) {
             Path candidate = repoPath.resolve(srcRoot).resolve(packageFilePath);
             if (Files.exists(candidate)) {
                 return srcRoot + packageFilePath;
             }
         }
-        // Fall back to test sources (most page objects live there)
+        // Fall back to test sources at repo root
         return "src/test/java/" + packageFilePath;
+    }
+
+    private String[] candidateSourceRoots() {
+        String[] standard = {"src/test/java/", "src/main/java/"};
+        try {
+            var submodulePrefixes = Files.list(repoPath)
+                    .filter(Files::isDirectory)
+                    .map(p -> p.getFileName().toString())
+                    .filter(name -> !name.startsWith(".") && !name.equals("build"))
+                    .flatMap(sub -> java.util.Arrays.stream(standard).map(root -> sub + "/" + root))
+                    .toArray(String[]::new);
+
+            String[] all = new String[standard.length + submodulePrefixes.length];
+            System.arraycopy(standard, 0, all, 0, standard.length);
+            System.arraycopy(submodulePrefixes, 0, all, standard.length, submodulePrefixes.length);
+            return all;
+        } catch (IOException e) {
+            log.debug("Could not list submodules of {}: {}", repoPath, e.getMessage());
+            return standard;
+        }
     }
 
     private CredentialsProvider credentialsProvider() {

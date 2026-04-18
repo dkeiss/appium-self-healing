@@ -12,7 +12,7 @@ import static org.assertj.core.api.Assertions.assertThat;
  */
 class GitHubPrServiceTest {
 
-    private final SelfHealingProperties.GitPr config = new SelfHealingProperties.GitPr(true, "origin", "main",
+    private final SelfHealingProperties.GitPr config = new SelfHealingProperties.GitPr(true, false, "origin", "main",
             "fix/self-healing-", "test-token", "test-owner", "test-repo");
 
     private final GitHubPrService service = new GitHubPrService(config);
@@ -49,6 +49,21 @@ class GitHubPrServiceTest {
 
         // Should not contain a "Healed locator:" line when expression is null
         assertThat(body).doesNotContain("**Healed locator:**");
+    }
+
+    @Test
+    void createPullRequest_dryRun_returnsDryRunUrlWithoutApiCall() throws java.io.IOException {
+        // Invalid token + owner/repo — if the API were actually called, this would fail.
+        var dryRunConfig = new SelfHealingProperties.GitPr(true, true, "origin", "main", "fix/self-healing-",
+                "invalid-token", "test-owner", "test-repo");
+        var dryRunService = new GitHubPrService(dryRunConfig);
+        var result = new HealingResult(true, null, "By.id(\"x\")", "source", "ok", 100, 50);
+
+        String url = dryRunService.createPullRequest("fix/self-healing-SearchPage-20260418-120000", "SearchPage",
+                "By.id(\"old\")", result, "scenario", "anthropic");
+
+        assertThat(url).startsWith("dry-run://test-owner/test-repo/pulls")
+                .contains("head=fix/self-healing-SearchPage-20260418-120000").contains("base=main");
     }
 
     @Test

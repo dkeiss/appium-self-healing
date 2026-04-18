@@ -26,6 +26,7 @@ self-healing:
     enabled: ${SELF_HEALING_CACHE_ENABLED:true}  # Set to false for LLM benchmark runs so a bad early heal cannot poison later scenarios
   git-pr:
     enabled: false  # Enable to auto-create PRs for healed locators
+    dry-run: false  # When true, log the PR plan (branch, commit, body) without push/API call — verify before enabling
     remote-name: origin
     base-branch: main
     branch-prefix: fix/self-healing-
