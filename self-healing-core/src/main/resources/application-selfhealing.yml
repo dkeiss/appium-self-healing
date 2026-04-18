@@ -22,6 +22,8 @@ self-healing:
     enabled: true
   mcp:
     enabled: false  # Enable when appium-mcp sidecar is running
+  vision:
+    enabled: ${SELF_HEALING_VISION_ENABLED:false}  # Attach failure screenshot to heal prompt (requires vision-capable LLM)
   cache:
     enabled: ${SELF_HEALING_CACHE_ENABLED:true}  # Set to false for LLM benchmark runs so a bad early heal cannot poison later scenarios
   git-pr:
@@ -74,6 +76,31 @@ spring:
           max-tokens: 4096
           cache-options:
             strategy: system-only
+
+---
+# Vision-enabled variant of the anthropic profile — same model (Sonnet 4.6 supports images),
+# but flips on the screenshot attachment in the heal prompt. Activate via:
+#   SPRING_PROFILES_ACTIVE=anthropic-vision,selfhealing
+spring:
+  config:
+    activate:
+      on-profile: anthropic-vision
+  ai:
+    model:
+      chat: anthropic
+    anthropic:
+      api-key: ${ANTHROPIC_API_KEY:}
+      chat:
+        options:
+          model: claude-sonnet-4-6
+          temperature: 0.1
+          max-tokens: 4096
+          cache-options:
+            strategy: system-only
+
+self-healing:
+  vision:
+    enabled: true
 
 ---
 spring:

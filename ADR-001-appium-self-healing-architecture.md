@@ -506,7 +506,7 @@ docker compose run self-healing-runner --benchmark --report
 - iOS-App-Modul und XCUITest-Integration
 - Persistierung geheilter Locatoren über Runtime-Fix hinaus: PR-Erstellung ist umgesetzt (`AutoFixPrCreator` + `GitService` + `GitHubPrService`, inkl. Dry-Run-Modus). Offen ist eine zusätzliche In-Repo-Cache-Persistenz für wiederkehrende Heilungen.
 - A2A-Protocol-Integration für Agent-zu-Agent-Kommunikation (Spring AI A2A)
-- Vision-Model-Integration für Screenshot-basiertes Healing (Appium MCP unterstützt bereits Qwen3-VL)
+- ~~Vision-Model-Integration für Screenshot-basiertes Healing~~ — umgesetzt (`self-healing.vision.enabled`, Profil `anthropic-vision`). Offen bleibt: Vergleichs-Benchmark Vision vs. Text-only über mehrere Provider.
 
 ---
 
@@ -563,5 +563,5 @@ docker compose run self-healing-runner --benchmark --report
 ### Phase 5: Erweiterungen
 22. [ ] iOS-App-Modul hinzufügen
 23. [x] PR-Erstellung für geheilte Locatoren (wie AICurator) — `AutoFixPrCreator` + JGit + kohsuke/github-api, Dry-Run-Modus via `SELF_HEALING_GIT_PR_DRY_RUN`, Submodul-aware Pfad-Resolver, verifiziert mit Anthropic Sonnet und lokalem Devstral. Siehe README-Abschnitt "PR-Erstellung für geheilte Locatoren".
-24. [ ] Vision-Model-basiertes Healing (Screenshot-Analyse)
+24. [x] Vision-Model-basiertes Healing (Screenshot-Analyse) — `self-healing.vision.enabled` schaltet Anhängen des Failure-Screenshots als Spring AI `Media` (image/png) an die `LocatorHealer`-Prompt frei. Profil `anthropic-vision` als Referenz-Setup mit Claude Sonnet 4.6. Siehe README-Abschnitt "Vision-Healing".
 25. [ ] A2A-Integration für Multi-Agent-Kommunikation

@@ -69,7 +69,20 @@ public class LocatorPromptCreator {
     }
 
     public String createUserPrompt(FailureContext context) {
+        return createUserPrompt(context, false);
+    }
+
+    public String createUserPrompt(FailureContext context, boolean withVision) {
         var sb = new StringBuilder();
+
+        if (withVision) {
+            sb.append("## Screenshot\n");
+            sb.append("A PNG screenshot of the current screen is attached to this message.\n");
+            sb.append("Use it to visually identify the element the broken locator was targeting:\n");
+            sb.append("- Match labels, icons, and layout positions to entries in the XML page source below.\n");
+            sb.append("- The element's on-screen text or icon often disambiguates between multiple\n");
+            sb.append("  candidate resource-ids in the XML.\n\n");
+        }
 
         sb.append("## Exception\n");
         sb.append(firstLine(context.exceptionMessage())).append("\n\n");

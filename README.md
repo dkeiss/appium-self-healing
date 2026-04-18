@@ -812,6 +812,20 @@ SPRING_PROFILES_ACTIVE=anthropic,selfhealing # oder local-devstral,selfhealing
 - **Triage** ruft das LLM ebenfalls auf. Bei lokalen Modellen (Devstral) sollte `selfhealing.triage.enabled=false` gesetzt oder ein Anthropic-Dummy-Key gestellt werden, sonst schlägt die Triage-Stufe vor dem Heal fehl.
 - **Verifiziert mit** Anthropic Claude Sonnet sowie lokalem Devstral Small 2 (LM Studio, OpenAI-kompatibel).
 
+### Vision-Healing (Screenshot als Heal-Input)
+
+Wenn `self-healing.vision.enabled=true` (oder Profil `anthropic-vision`), hängt der `LocatorHealer` den Failure-Screenshot als PNG-`Media`-Anhang an die Heal-Prompt. Hilft bei mehrdeutigen XML-Hierarchien (z. B. mehreren Buttons mit ähnlichen resource-ids) — der LLM kann das Element visuell anhand von Label, Icon oder Layout-Position disambiguieren.
+
+```bash
+SPRING_PROFILES_ACTIVE=anthropic-vision,selfhealing
+# oder explizit per Env-Var auf einem anderen Provider:
+SELF_HEALING_VISION_ENABLED=true
+```
+
+**Voraussetzung:** Vision-fähiges Modell — verifiziert für Anthropic Claude Sonnet 4.6 (Profil `anthropic-vision`). GPT-4.1 (`openai`) und Qwen3-VL-Varianten unterstützen es ebenfalls. Nicht-Vision-Modelle (Devstral, Mistral Codestral, GLM-4.7-Flash) ignorieren das Image bzw. lehnen es ab — Flag dort ausgeschaltet lassen.
+
+Der Screenshot wird ohnehin schon im `FailureContext` mitgeführt (für Debug-Reports). Vision-Modus aktiviert nur das Anhängen ans LLM-Prompt — keine zusätzliche Capture-Operation.
+
 ### Docker-Services
 
 | Service | Port | Beschreibung |
@@ -830,8 +844,8 @@ SPRING_PROFILES_ACTIVE=anthropic,selfhealing # oder local-devstral,selfhealing
 - [x] **Phase 2**: App v2, Prompt-Optimierung, StepHealer, MCP-Integration, Benchmark
 - [x] **Phase 3**: Root-Cause-Analyse (EnvironmentChecker, AppBugReporter)
 - [x] **Phase 4**: Benchmark-Automatisierung (vollständiger LLM-Vergleich)
-- [x] **Phase 5 (teilweise)**: PR-Erstellung für geheilte Locatoren inkl. Dry-Run (Anthropic + lokaler Devstral verifiziert)
-- [ ] **Phase 5 (offen)**: iOS, Vision-Models, A2A-Integration
+- [x] **Phase 5 (teilweise)**: PR-Erstellung für geheilte Locatoren inkl. Dry-Run (Anthropic + lokaler Devstral verifiziert) + Vision-Healing-Modus (Screenshot-Anhang via Spring AI Media, Profil `anthropic-vision`)
+- [ ] **Phase 5 (offen)**: iOS, A2A-Integration
 
 ---
 
