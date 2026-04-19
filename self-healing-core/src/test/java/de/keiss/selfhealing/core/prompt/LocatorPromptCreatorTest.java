@@ -22,8 +22,7 @@ class LocatorPromptCreatorTest {
 
         String prompt = creator.createUserPrompt(context, true);
 
-        assertThat(prompt).startsWith("## Screenshot")
-                .contains("PNG screenshot of the current screen is attached")
+        assertThat(prompt).startsWith("## Screenshot").contains("PNG screenshot of the current screen is attached")
                 .contains("Match labels, icons, and layout positions");
     }
 

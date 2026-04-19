@@ -10,7 +10,6 @@ import de.keiss.selfhealing.core.prompt.StepPromptCreator;
 import de.keiss.selfhealing.core.prompt.TriagePromptCreator;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.tool.ToolCallbackProvider;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.ApplicationEventPublisher;
@@ -48,9 +47,25 @@ public class SelfHealingAutoConfiguration {
         return new StepPromptCreator();
     }
 
+    /**
+     * The in-process LLM-backed healer. Always available — when A2A client mode is active it is not injected into the
+     * orchestrator directly but still powers the local A2A server endpoint in the same JVM.
+     */
     @Bean
-    public LocatorHealer locatorHealer(ChatClient.Builder chatClientBuilder, SelfHealingProperties properties) {
-        return new LocatorHealer(chatClientBuilder.build(), properties);
+    public ChatClientLocatorHealer chatClientLocatorHealer(ChatClient.Builder chatClientBuilder,
+            SelfHealingProperties properties) {
+        return new ChatClientLocatorHealer(chatClientBuilder.build(), properties);
+    }
+
+    /**
+     * Default {@link LocatorHealer} wiring — returns the in-process implementation. Only created if no other
+     * {@code LocatorHealer} bean (e.g. an A2A client proxy) has already been registered, so the A2A module can take
+     * over transparently.
+     */
+    @Bean
+    @org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean(LocatorHealer.class)
+    public LocatorHealer locatorHealer(ChatClientLocatorHealer chatClientLocatorHealer) {
+        return chatClientLocatorHealer;
     }
 
     @Bean

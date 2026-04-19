@@ -105,10 +105,14 @@ public class SelfHealingAppiumDriver {
                     highlightHealedElement(result.healedLocatorExpression());
                     captureHealingScreenshot(failedLocator, result.healedLocator());
                     return element;
-                } catch (NoSuchElementException retryFail) {
-                    log.warn("Healed locator also failed: {} — retrying...", result.healedLocator());
-                    // Keep original failedLocator, record rejected heal so the next attempt
-                    // does not repeat the same non-existent suggestion.
+                } catch (NoSuchElementException | InvalidSelectorException retryFail) {
+                    // NoSuchElementException  — healed locator exists in syntax but element not on screen
+                    // InvalidSelectorException — healed locator is syntactically invalid (e.g. LLM invented a
+                    //   non-existent UIAutomator method like `contentDescriptionStartsWith`).
+                    // In both cases the suggestion is unusable: add it to rejectedLocators so the next LLM
+                    // call doesn't repeat it, and bypass the cache (handled in HealingOrchestrator).
+                    log.warn("Healed locator also failed: {} — {} — retrying...", result.healedLocator(),
+                            retryFail.getClass().getSimpleName());
                     context = context.withRejectedLocator(result.healedLocator());
                 }
             } else {
@@ -132,8 +136,8 @@ public class SelfHealingAppiumDriver {
     }
 
     /**
-     * Returns and clears all healing screenshots captured since the last call.
-     * Called by test hooks (e.g. Cucumber @After) to attach screenshots to reports.
+     * Returns and clears all healing screenshots captured since the last call. Called by test hooks (e.g.
+     * Cucumber @After) to attach screenshots to reports.
      */
     public List<HealingScreenshot> getAndClearHealingScreenshots() {
         List<HealingScreenshot> copy = List.copyOf(healingScreenshots);
@@ -142,8 +146,8 @@ public class SelfHealingAppiumDriver {
     }
 
     /**
-     * Captures a screenshot right after the highlight broadcast, so the red border
-     * is visible. Waits briefly for the Compose animation to render.
+     * Captures a screenshot right after the highlight broadcast, so the red border is visible. Waits briefly for the
+     * Compose animation to render.
      */
     private void captureHealingScreenshot(By originalLocator, By healedLocator) {
         try {
@@ -158,8 +162,8 @@ public class SelfHealingAppiumDriver {
     }
 
     /**
-     * Sends a broadcast to the Android app to visually highlight the healed element with a red
-     * border. Visible in noVNC during demos.
+     * Sends a broadcast to the Android app to visually highlight the healed element with a red border. Visible in noVNC
+     * during demos.
      */
     private void highlightHealedElement(String locatorExpression) {
         if (locatorExpression == null) {
@@ -168,8 +172,8 @@ public class SelfHealingAppiumDriver {
         try {
             // Extract the raw tag value from expressions like "accessibilityId(fab_search)"
             String tag = locatorExpression.replaceAll(".*\\((.+)\\)", "$1");
-            delegate.executeScript("mobile: shell", Map.of(
-                    "command", "am broadcast -a de.keiss.selfhealing.HIGHLIGHT --es tag " + tag));
+            delegate.executeScript("mobile: shell",
+                    Map.of("command", "am broadcast -a de.keiss.selfhealing.HIGHLIGHT --es tag " + tag));
             log.debug("Highlight broadcast sent for tag: {}", tag);
         } catch (Exception e) {
             log.debug("Could not send highlight broadcast: {}", e.getMessage());

@@ -42,6 +42,17 @@ public class PromptCache {
         }
     }
 
+    /**
+     * Removes a specific entry from the cache. Called by the orchestrator when a previously cached heal turned out to
+     * return a non-existent locator (detected at retry time in the driver) — keeping the bad entry would poison every
+     * subsequent scenario that hits the same failed locator.
+     */
+    public void invalidate(String locatorKey) {
+        if (cache.remove(locatorKey) != null) {
+            log.debug("Invalidated cached healing for: {}", locatorKey);
+        }
+    }
+
     public void clear() {
         cache.clear();
         hits = 0;

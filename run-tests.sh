@@ -31,7 +31,7 @@ echo "║  LLM Provider: $LLM_PROVIDER                     ║"
 echo "╚══════════════════════════════════════════════════╝"
 
 cleanup() {
-    echo "Cleaning up Docker containers..."
+    echo "Cleaning up containers..."
     docker compose down 2>/dev/null
 }
 

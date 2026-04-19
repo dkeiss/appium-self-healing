@@ -33,10 +33,8 @@ class DryRunSmokeTest {
         var creator = new AutoFixPrCreator(gitService, gitHubPrService, noopPublisher);
 
         var healingResult = new HealingResult(true, null, "By.id(\"departure_station\")",
-                "package de.keiss.selfhealing.tests.pages;\n\n"
-                        + "public class SearchPage {\n"
-                        + "    private static final By INPUT_FROM = By.id(\"departure_station\");\n"
-                        + "}\n",
+                "package de.keiss.selfhealing.tests.pages;\n\n" + "public class SearchPage {\n"
+                        + "    private static final By INPUT_FROM = By.id(\"departure_station\");\n" + "}\n",
                 "The locator was renamed from input_from to departure_station in the new app version.", 1200, 850);
         var event = new HealingEvent(Instant.now(), "der Nutzer sucht eine Verbindung", FailureCategory.LOCATOR_CHANGED,
                 healingResult, "By.id(\"input_from\")", "anthropic", "SearchPage",
@@ -62,8 +60,7 @@ class DryRunSmokeTest {
                 .contains("fix(self-healing): update SearchPage locators")
                 .contains("[DRY-RUN] Would open PR on dkeiss/appium-self-healing")
                 .contains("dry-run://dkeiss/appium-self-healing/pulls?head=fix/self-healing-SearchPage-")
-                .contains("base=self-healing-playground")
-                .contains("Title: fix: Self-Healing SearchPage")
+                .contains("base=self-healing-playground").contains("Title: fix: Self-Healing SearchPage")
                 .contains("## Self-Healing: Auto-Fix for SearchPage")
                 .contains("**Original locator:** `By.id(\"input_from\")`")
                 .contains("**Healed locator:** `By.id(\"departure_station\")`");

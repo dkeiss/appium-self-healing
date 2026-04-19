@@ -53,13 +53,17 @@ class EnvironmentIssueIntegrationTest {
     void unreachableBackend_triggersTerminalDiagnostic_withoutCallingLocatorHealer() {
         // --- Arrange ---
         var properties = new SelfHealingProperties(true, 3, "anthropic", null, new Triage(true), new Mcp(false),
-                new Vision(false), Cache.defaults(),
-                new EnvironmentCheck(true, "http://127.0.0.1:1/health", // unreachable — OS rejects connection instantly
+                new Vision(false), Cache.defaults(), new EnvironmentCheck(true, "http://127.0.0.1:1/health", // unreachable
+                                                                                                             // — OS
+                                                                                                             // rejects
+                                                                                                             // connection
+                                                                                                             // instantly
                         null, // no Appium probe in this test
                         500, // connect timeout — fail fast
                         500, // request timeout
                         10 // retry backoff (not used on terminal path, kept small for safety)
-                ), BugReports.defaults(), null // gitPr — not relevant for environment tests
+                ), BugReports.defaults(), null, // gitPr — not relevant for environment tests
+                null // a2a — not relevant for environment tests
         );
 
         var triageAgent = new StubTriageAgent(FailureCategory.ENVIRONMENT_ISSUE, "Backend health check failed", 0.95);
@@ -120,7 +124,8 @@ class EnvironmentIssueIntegrationTest {
                     new Vision(false), Cache.defaults(),
                     new EnvironmentCheck(true, "http://127.0.0.1:" + port + "/health", // reachable
                             null, 500, 500, 50 // retry backoff — short but observable via spy
-                    ), BugReports.defaults(), null // gitPr — not relevant for environment tests
+                    ), BugReports.defaults(), null, // gitPr — not relevant for environment tests
+                    null // a2a — not relevant for environment tests
             );
 
             var triageAgent = new StubTriageAgent(FailureCategory.ENVIRONMENT_ISSUE, "Network flakiness suspected",
