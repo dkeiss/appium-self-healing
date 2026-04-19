@@ -44,8 +44,8 @@ public class SelfHealingSteps {
                 log.info("║    Original: {}", event.originalLocator());
                 log.info("║    Healed:   {}", event.healingResult().healedLocatorExpression());
                 log.info("║    Time:     {}ms", event.healingResult().healingDurationMs());
-                log.info("║    Tokens:   {}", event.healingResult().tokensUsed() > 0
-                        ? event.healingResult().tokensUsed() : "n/a");
+                log.info("║    Tokens:   {}",
+                        event.healingResult().tokensUsed() > 0 ? event.healingResult().tokensUsed() : "n/a");
                 log.info("║    Provider: {}", event.llmProvider());
                 log.info("║    Reason:   {}", event.healingResult().explanation());
                 log.info("║");

@@ -33,7 +33,8 @@ public class McpContextEnricher {
     public FailureContext enrich(FailureContext context) {
         ToolCallbackProvider provider = mcpToolProvider.getIfAvailable();
         if (provider == null) {
-            log.warn("MCP enrichment skipped: no ToolCallbackProvider bean available (is spring-ai-starter-mcp-client configured?)");
+            log.warn(
+                    "MCP enrichment skipped: no ToolCallbackProvider bean available (is spring-ai-starter-mcp-client configured?)");
             return context;
         }
         log.info("Enriching failure context via MCP...");

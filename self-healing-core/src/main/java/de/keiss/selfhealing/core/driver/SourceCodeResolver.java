@@ -85,10 +85,8 @@ public class SourceCodeResolver {
 
         // Collect immediate subdirectory names (submodules like "integration-tests", "backend", ...)
         try {
-            var submodulePrefixes = Files.list(sourceBasePath)
-                    .filter(Files::isDirectory)
-                    .map(p -> p.getFileName().toString())
-                    .filter(name -> !name.startsWith(".") && !name.equals("build"))
+            var submodulePrefixes = Files.list(sourceBasePath).filter(Files::isDirectory)
+                    .map(p -> p.getFileName().toString()).filter(name -> !name.startsWith(".") && !name.equals("build"))
                     .flatMap(sub -> java.util.Arrays.stream(standard).map(root -> sub + "/" + root))
                     .toArray(String[]::new);
 

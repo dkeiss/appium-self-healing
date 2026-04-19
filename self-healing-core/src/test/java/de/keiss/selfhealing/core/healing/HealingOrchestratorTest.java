@@ -51,7 +51,8 @@ class HealingOrchestratorTest {
 
         assertThat(first.success()).isTrue();
         assertThat(second.success()).isTrue();
-        assertThat(healer.callCount).as("second call must be served from cache, not re-invoke the LLM healer").isEqualTo(1);
+        assertThat(healer.callCount).as("second call must be served from cache, not re-invoke the LLM healer")
+                .isEqualTo(1);
         assertThat(cache.size()).as("successful heal is persisted in cache").isEqualTo(1);
         assertThat(cache.getHits()).isEqualTo(1);
         assertThat(publisher.events).as("cache hit short-circuits before publishing a new event").hasSize(1);
@@ -119,7 +120,8 @@ class HealingOrchestratorTest {
 
     private static SelfHealingProperties propertiesWithCache(boolean cacheEnabled) {
         return new SelfHealingProperties(true, 3, "anthropic", null, new Triage(true), new Mcp(false),
-                new Vision(false), new Cache(cacheEnabled), EnvironmentCheck.defaults(), BugReports.defaults(), null);
+                new Vision(false), new Cache(cacheEnabled), EnvironmentCheck.defaults(), BugReports.defaults(), null,
+                null);
     }
 
     private static FailureContext failureContextForLocator(By locator) {
@@ -144,13 +146,12 @@ class HealingOrchestratorTest {
         }
     }
 
-    private static class StubLocatorHealer extends LocatorHealer {
+    private static class StubLocatorHealer implements LocatorHealer {
 
         HealingResult nextResult;
         int callCount = 0;
 
         StubLocatorHealer(HealingResult result) {
-            super(null, null);
             this.nextResult = result;
         }
 
@@ -161,13 +162,12 @@ class HealingOrchestratorTest {
         }
     }
 
-    private static final class ScriptedLocatorHealer extends LocatorHealer {
+    private static final class ScriptedLocatorHealer implements LocatorHealer {
 
         private final List<HealingResult> scripted;
         int callCount = 0;
 
         ScriptedLocatorHealer(HealingResult... results) {
-            super(null, null);
             this.scripted = List.of(results);
         }
 

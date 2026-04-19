@@ -32,8 +32,8 @@ public class TriageAgent {
             try {
                 Usage usage = chatResponse.getMetadata().getUsage();
                 if (usage != null) {
-                    log.info("Triage token usage — prompt: {}, completion: {}, total: {}",
-                            usage.getPromptTokens(), usage.getCompletionTokens(), usage.getTotalTokens());
+                    log.info("Triage token usage — prompt: {}, completion: {}, total: {}", usage.getPromptTokens(),
+                            usage.getCompletionTokens(), usage.getTotalTokens());
 
                     // Extract Anthropic cache metrics via the native usage object
                     try {
@@ -48,8 +48,7 @@ public class TriageAgent {
                             Long cacheRead = invokeOptionalLong(nativeUsage, "cacheReadInputTokens");
                             if (cacheCreation != null || cacheRead != null) {
                                 log.info("Triage cache — creation: {}, read: {} tokens",
-                                        cacheCreation != null ? cacheCreation : 0,
-                                        cacheRead != null ? cacheRead : 0);
+                                        cacheCreation != null ? cacheCreation : 0, cacheRead != null ? cacheRead : 0);
                             }
                         }
                     } catch (Exception ignored) {
@@ -75,7 +74,8 @@ public class TriageAgent {
     }
 
     private String extractJson(String raw) {
-        if (raw == null || raw.isBlank()) return "{}";
+        if (raw == null || raw.isBlank())
+            return "{}";
         String cleaned = raw.replaceAll("(?s)^```(?:json)?\\s*", "").replaceAll("(?s)\\s*```$", "").trim();
         int start = cleaned.indexOf('{');
         int end = cleaned.lastIndexOf('}');

@@ -5,7 +5,7 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 @ConfigurationProperties(prefix = "self-healing")
 public record SelfHealingProperties(boolean enabled, int maxRetries, String llmProvider, String sourceBasePath,
         Triage triage, Mcp mcp, Vision vision, Cache cache, EnvironmentCheck environmentCheck, BugReports bugReports,
-        GitPr gitPr) {
+        GitPr gitPr, A2a a2a) {
 
     public SelfHealingProperties {
         if (maxRetries <= 0)
@@ -26,6 +26,8 @@ public record SelfHealingProperties(boolean enabled, int maxRetries, String llmP
             bugReports = BugReports.defaults();
         if (gitPr == null)
             gitPr = GitPr.defaults();
+        if (a2a == null)
+            a2a = A2a.defaults();
     }
 
     public record Triage(boolean enabled) {
@@ -35,9 +37,9 @@ public record SelfHealingProperties(boolean enabled, int maxRetries, String llmP
     }
 
     /**
-     * When enabled, the LocatorHealer attaches the failure screenshot (PNG) to the LLM prompt as a multimodal
-     * input. Only useful with vision-capable providers (Claude Sonnet, GPT-4o, Qwen3-VL). Default off so non-vision
-     * providers (Devstral, GLM-Flash) keep working unchanged.
+     * When enabled, the LocatorHealer attaches the failure screenshot (PNG) to the LLM prompt as a multimodal input.
+     * Only useful with vision-capable providers (Claude Sonnet, GPT-4o, Qwen3-VL). Default off so non-vision providers
+     * (Devstral, GLM-Flash) keep working unchanged.
      */
     public record Vision(boolean enabled) {
     }
@@ -102,6 +104,51 @@ public record SelfHealingProperties(boolean enabled, int maxRetries, String llmP
 
         public static GitPr defaults() {
             return new GitPr(false, false, "origin", "main", "fix/self-healing-", null, null, null);
+        }
+    }
+
+    /**
+     * Agent-to-Agent (A2A) integration settings. The {@code server} half exposes healing agents behind an
+     * A2A-conformant HTTP/JSON-RPC endpoint (Agent Card at {@code /.well-known/agent.json}, {@code message/send} for
+     * invocation). The {@code client} half swaps the in-process {@link de.keiss.selfhealing.core.healing.LocatorHealer}
+     * for a remote proxy that calls another process speaking A2A. Both sides are independent — for the first migration
+     * spike we typically run both in the same JVM so existing benchmarks exercise the full wire path.
+     */
+    public record A2a(Server server, Client client) {
+
+        public A2a {
+            if (server == null)
+                server = Server.defaults();
+            if (client == null)
+                client = Client.defaults();
+        }
+
+        public static A2a defaults() {
+            return new A2a(Server.defaults(), Client.defaults());
+        }
+
+        public record Server(boolean enabled, String basePath) {
+
+            public Server {
+                if (basePath == null || basePath.isBlank())
+                    basePath = "/a2a";
+            }
+
+            public static Server defaults() {
+                return new Server(false, "/a2a");
+            }
+        }
+
+        public record Client(boolean enabled, String locatorHealerUrl, long requestTimeoutMs) {
+
+            public Client {
+                if (requestTimeoutMs <= 0)
+                    requestTimeoutMs = 180_000;
+            }
+
+            public static Client defaults() {
+                return new Client(false, null, 180_000);
+            }
         }
     }
 }

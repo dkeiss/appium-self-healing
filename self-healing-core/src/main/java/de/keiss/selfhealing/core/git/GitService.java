@@ -108,9 +108,7 @@ public class GitService {
     private String[] candidateSourceRoots() {
         String[] standard = {"src/test/java/", "src/main/java/"};
         try {
-            var submodulePrefixes = Files.list(repoPath)
-                    .filter(Files::isDirectory)
-                    .map(p -> p.getFileName().toString())
+            var submodulePrefixes = Files.list(repoPath).filter(Files::isDirectory).map(p -> p.getFileName().toString())
                     .filter(name -> !name.startsWith(".") && !name.equals("build"))
                     .flatMap(sub -> java.util.Arrays.stream(standard).map(root -> sub + "/" + root))
                     .toArray(String[]::new);

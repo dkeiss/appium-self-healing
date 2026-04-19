@@ -53,7 +53,8 @@ public class AppSteps {
 
         // Attach healing screenshots (captured right after each heal with red highlight border)
         try {
-            for (SelfHealingAppiumDriver.HealingScreenshot hs : testConfig.getDriver().getAndClearHealingScreenshots()) {
+            for (SelfHealingAppiumDriver.HealingScreenshot hs : testConfig.getDriver()
+                    .getAndClearHealingScreenshots()) {
                 scenario.attach(hs.data(), "image/png", hs.description());
                 log.info("Attached healing screenshot: {}", hs.description());
             }

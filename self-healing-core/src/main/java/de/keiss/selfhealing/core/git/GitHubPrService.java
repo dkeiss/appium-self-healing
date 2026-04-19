@@ -43,7 +43,8 @@ public class GitHubPrService {
 
         if (config.dryRun()) {
             String repoFullName = config.githubRepoOwner() + "/" + config.githubRepoName();
-            String dryRunUrl = "dry-run://" + repoFullName + "/pulls?head=" + branchName + "&base=" + config.baseBranch();
+            String dryRunUrl = "dry-run://" + repoFullName + "/pulls?head=" + branchName + "&base="
+                    + config.baseBranch();
             log.info("[DRY-RUN] Would open PR on {}: {} ({} → {})\nTitle: {}\nBody:\n{}", repoFullName, dryRunUrl,
                     branchName, config.baseBranch(), title, body);
             return dryRunUrl;

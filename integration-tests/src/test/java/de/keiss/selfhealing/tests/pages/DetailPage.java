@@ -9,14 +9,12 @@ import org.springframework.stereotype.Component;
 /**
  * Page Object for the per-leg detail information ("very-hard-navigation" track).
  *
- * In v1 the leg details (train number and platform) are rendered inline on each connection card,
- * reachable without any navigation. In v2 they live inside a ModalBottomSheet that is only shown
- * after tapping the journey card, so the locators must first be discovered after a click-driven
- * navigation (different DOM, different ids):
+ * In v1 the leg details (train number and platform) are rendered inline on each connection card, reachable without any
+ * navigation. In v2 they live inside a ModalBottomSheet that is only shown after tapping the journey card, so the
+ * locators must first be discovered after a click-driven navigation (different DOM, different ids):
  *
- *   "connection_item"  → "journey_card"            (rename + triggers bottom-sheet)
- *   "leg_train_number" → "leg_item_0_train"        (moved into bottom sheet)
- *   "leg_platform"     → "leg_item_0_platform"     (moved into bottom sheet)
+ * "connection_item" → "journey_card" (rename + triggers bottom-sheet) "leg_train_number" → "leg_item_0_train" (moved
+ * into bottom sheet) "leg_platform" → "leg_item_0_platform" (moved into bottom sheet)
  */
 @Component
 @RequiredArgsConstructor

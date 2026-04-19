@@ -10,6 +10,7 @@ rootProject.name = "appium-self-healing"
 
 include("backend")
 include("self-healing-core")
+include("self-healing-a2a")
 include("integration-tests")
 include("benchmark")
 // include("android-app") // Separate Android build — see android-app/README.md

@@ -4,6 +4,7 @@ COPY gradlew settings.gradle.kts build.gradle.kts gradle.properties ./
 COPY gradle/ gradle/
 COPY backend/ backend/
 COPY self-healing-core/build.gradle.kts self-healing-core/build.gradle.kts
+COPY self-healing-a2a/build.gradle.kts self-healing-a2a/build.gradle.kts
 COPY integration-tests/build.gradle.kts integration-tests/build.gradle.kts
 COPY benchmark/build.gradle.kts benchmark/build.gradle.kts
 RUN sed -i 's/\r$//' gradlew && chmod +x gradlew && ./gradlew :backend:bootJar --no-daemon

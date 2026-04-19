@@ -31,8 +31,8 @@ echo "║  LLM Provider: $LLM_PROVIDER                     ║"
 echo "╚══════════════════════════════════════════════════╝"
 
 cleanup() {
-    echo "Cleaning up Docker containers..."
-    docker compose down 2>/dev/null
+    echo "Cleaning up containers..."
+    podman compose down 2>/dev/null
 }
 
 if [ "$APP_VERSION" = "benchmark" ]; then
@@ -40,14 +40,14 @@ if [ "$APP_VERSION" = "benchmark" ]; then
     cd docker
     cleanup
     trap cleanup EXIT
-    docker compose --profile benchmark up --build --force-recreate benchmark-runner
+    podman compose --profile benchmark up --build --force-recreate benchmark-runner
 else
     export APP_VERSION
     export LLM_PROVIDER
     cd docker
     cleanup
     trap cleanup EXIT
-    docker compose up --build --force-recreate test-runner
+    podman compose up --build --force-recreate test-runner
     # Preserve version-specific reports so subsequent runs don't overwrite them
     cp ../build/reports/cucumber.html "../build/reports/cucumber-${APP_VERSION}.html" 2>/dev/null
     cp ../build/reports/cucumber.json "../build/reports/cucumber-${APP_VERSION}.json" 2>/dev/null
