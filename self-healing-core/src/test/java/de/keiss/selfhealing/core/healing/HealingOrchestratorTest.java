@@ -116,6 +116,45 @@ class HealingOrchestratorTest {
         assertThat(cache.size()).isZero();
     }
 
+    @Test
+    void retryWithRejectedLocators_bypassesCache_andInvalidatesStaleEntry() {
+        // Reproduces the Mistral BottomSheet bug: attempt 1 heals `leg_platform` -> `leg_item_0_platform`
+        // (cached as success because the LLM returned success=true), but the healed locator doesn't resolve
+        // on the page. The driver retries with rejectedLocators=[leg_item_0_platform]. Without the fix the
+        // orchestrator would return the cached bad answer instead of re-asking the LLM with the rejection.
+        var properties = propertiesWithCache(true);
+        var triage = new StubTriageAgent(FailureCategory.LOCATOR_CHANGED, "locator changed", 0.9);
+        var healer = new ScriptedLocatorHealer(
+                // attempt 1: LLM hallucinates a non-existent id (succeeds from LLM's POV)
+                new HealingResult(true, By.id("leg_item_0_platform"), "id(\"leg_item_0_platform\")", null,
+                        "hallucinated", 10, 0),
+                // attempt 2: LLM sees rejectedLocators and produces a correct UIAutomator selector
+                new HealingResult(true, By.id("platform_label"), "id(\"platform_label\")", null, "correct heal", 10,
+                        0));
+        var cache = new PromptCache();
+        var publisher = new RecordingEventPublisher();
+
+        var orchestrator = new HealingOrchestrator(triage, healer, null, cache, null, null, null, properties,
+                publisher);
+
+        By failedLocator = By.id("leg_platform");
+        var firstAttempt = failureContextForLocator(failedLocator);
+        HealingResult first = orchestrator.attemptHealing(firstAttempt);
+        assertThat(first.healedLocator()).isEqualTo(By.id("leg_item_0_platform"));
+        assertThat(cache.size()).as("first heal is cached even if it later turns out wrong at runtime").isEqualTo(1);
+
+        // Driver detects leg_item_0_platform doesn't resolve, retries with rejection
+        var retryContext = firstAttempt.withRejectedLocator(By.id("leg_item_0_platform"));
+        HealingResult second = orchestrator.attemptHealing(retryContext);
+
+        assertThat(second.healedLocator()).as("retry must get a fresh heal, not the cached hallucination")
+                .isEqualTo(By.id("platform_label"));
+        assertThat(healer.callCount).as("LLM must be re-invoked on retry so it sees the rejection list").isEqualTo(2);
+        // The new correct answer should have replaced the stale one — cache contains only the good heal.
+        assertThat(cache.getAllEntries().values()).extracting(HealingResult::healedLocator)
+                .containsExactly(By.id("platform_label"));
+    }
+
     // --- Helpers ---------------------------------------------------------------------
 
     private static SelfHealingProperties propertiesWithCache(boolean cacheEnabled) {

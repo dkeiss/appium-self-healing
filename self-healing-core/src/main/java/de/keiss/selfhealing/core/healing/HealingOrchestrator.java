@@ -38,15 +38,26 @@ public class HealingOrchestrator {
         boolean cacheEnabled = properties.cache().enabled();
         String cacheKey = buildCacheKey(context);
 
+        // A non-empty rejectedLocators list means this is a driver-level retry after a previously-healed locator
+        // failed to resolve on the page. In that case, a cache hit would just return the same bad answer, so we
+        // bypass the cache AND invalidate the entry — otherwise the bad suggestion poisons every later scenario
+        // that hits the same broken locator (observed with Mistral hallucinating `leg_item_0_platform` for v2
+        // BottomSheet scenario, where all 3 retries kept returning the cached non-existent id).
+        boolean isRetry = context.rejectedLocators() != null && !context.rejectedLocators().isEmpty();
+
         // Check cache first — skipped entirely when disabled so benchmark runs can
         // compare the LLM's heal quality per scenario without a bad early heal
         // poisoning every subsequent scenario via cache hit.
-        if (cacheEnabled) {
+        if (cacheEnabled && !isRetry) {
             HealingResult cached = promptCache.get(cacheKey);
             if (cached != null) {
                 log.info("Using cached healing for: {}", cacheKey);
                 return cached;
             }
+        } else if (isRetry && cacheEnabled) {
+            log.info("Retry with {} rejected locator(s) — bypassing cache and invalidating stale entry for: {}",
+                    context.rejectedLocators().size(), cacheKey);
+            promptCache.invalidate(cacheKey);
         } else {
             log.debug("Cache disabled — skipping lookup for: {}", cacheKey);
         }

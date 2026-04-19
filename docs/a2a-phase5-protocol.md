@@ -240,6 +240,25 @@ Benchmark-Logs zeigen 3 Versuche × Spring AI Retry (9×) pro Szenario, bevor au
 - Anthropic heilt im Benchmark alle 6/6 (inkl. BottomSheet) durch Cache-Wiederverwendung aus dem ersten Szenario.
 - Mistral scheitert konsistent an `leg_platform` (halluziniert eine ID statt UI-Automator-Selektor).
 
+### 5.4 Bug-Fix: Retry-Cache-Poisoning (Post-Benchmark)
+
+Beim Benchmark-Lauf wurde ein Bug entdeckt: Wenn der LLM einen nicht-existenten Locator
+halluziniert (Mistral → `leg_item_0_platform`), cached ihn der `HealingOrchestrator`
+als „erfolgreich" (aus LLM-Sicht ist er es). Der `SelfHealingAppiumDriver` merkt
+erst bei `findElement`, dass der Locator am UI nicht auflöst, und startet einen Retry
+mit `rejectedLocators=[leg_item_0_platform]`. **Der Orchestrator hat diesen Retry-Kontext
+aber ignoriert**, weil der Cache-Key nur den ursprünglichen `failedLocator` enthielt —
+alle 3 Retry-Versuche bekamen dieselbe falsche Antwort aus dem Cache, ohne dass der
+LocatorHealer je die Rejection-Liste sah.
+
+**Fix** (`HealingOrchestrator.attemptHealing`):
+- Wenn `rejectedLocators` nicht leer ist → Cache-Lookup überspringen und stalen Eintrag invalidieren
+- `PromptCache.invalidate(key)` neu hinzugefügt
+- Dedizierter Test `retryWithRejectedLocators_bypassesCache_andInvalidatesStaleEntry` ergänzt
+
+Damit sieht der LLM auf Retry tatsächlich die rejectedLocators, und ein verbranntes
+Cache-Entry aus Szenario 1 vergiftet nicht mehr jedes Folge-Szenario mit demselben Locator.
+
 ---
 
 ## 6. Offene Punkte / Nächste Schritte
