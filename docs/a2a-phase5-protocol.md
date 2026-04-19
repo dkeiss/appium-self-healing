@@ -240,24 +240,44 @@ Benchmark-Logs zeigen 3 Versuche × Spring AI Retry (9×) pro Szenario, bevor au
 - Anthropic heilt im Benchmark alle 6/6 (inkl. BottomSheet) durch Cache-Wiederverwendung aus dem ersten Szenario.
 - Mistral scheitert konsistent an `leg_platform` (halluziniert eine ID statt UI-Automator-Selektor).
 
-### 5.4 Bug-Fix: Retry-Cache-Poisoning (Post-Benchmark)
+### 5.4 Bug-Fixes: Retry-Mechanismus (Post-Benchmark)
 
-Beim Benchmark-Lauf wurde ein Bug entdeckt: Wenn der LLM einen nicht-existenten Locator
-halluziniert (Mistral → `leg_item_0_platform`), cached ihn der `HealingOrchestrator`
-als „erfolgreich" (aus LLM-Sicht ist er es). Der `SelfHealingAppiumDriver` merkt
-erst bei `findElement`, dass der Locator am UI nicht auflöst, und startet einen Retry
-mit `rejectedLocators=[leg_item_0_platform]`. **Der Orchestrator hat diesen Retry-Kontext
-aber ignoriert**, weil der Cache-Key nur den ursprünglichen `failedLocator` enthielt —
-alle 3 Retry-Versuche bekamen dieselbe falsche Antwort aus dem Cache, ohne dass der
-LocatorHealer je die Rejection-Liste sah.
+Beim Benchmark-Lauf wurden zwei zusammenhängende Bugs im Retry-Mechanismus entdeckt.
+
+#### Bug 1 — Cache-Poisoning bei Retries
+
+Wenn der LLM einen nicht-existenten Locator halluziniert (Mistral → `leg_item_0_platform`),
+cached ihn der `HealingOrchestrator` als „erfolgreich" (aus LLM-Sicht war er es). Der Driver
+merkt erst bei `findElement`, dass der Locator am UI nicht auflöst, und startet einen Retry
+mit `rejectedLocators=[leg_item_0_platform]`. **Der Orchestrator ignorierte diesen Kontext**,
+weil der Cache-Key nur den ursprünglichen `failedLocator` enthielt — alle 3 Retries bekamen
+dieselbe falsche Antwort aus dem Cache, der LocatorHealer sah die Rejection-Liste nie.
 
 **Fix** (`HealingOrchestrator.attemptHealing`):
-- Wenn `rejectedLocators` nicht leer ist → Cache-Lookup überspringen und stalen Eintrag invalidieren
+- Wenn `rejectedLocators` nicht leer → Cache-Lookup überspringen + stalen Eintrag invalidieren
 - `PromptCache.invalidate(key)` neu hinzugefügt
-- Dedizierter Test `retryWithRejectedLocators_bypassesCache_andInvalidatesStaleEntry` ergänzt
+- Test `retryWithRejectedLocators_bypassesCache_andInvalidatesStaleEntry` ergänzt
 
-Damit sieht der LLM auf Retry tatsächlich die rejectedLocators, und ein verbranntes
-Cache-Entry aus Szenario 1 vergiftet nicht mehr jedes Folge-Szenario mit demselben Locator.
+#### Bug 2 — `InvalidSelectorException` brach Retry-Loop ab
+
+Anthropic halluzinierte UIAutomator-Methoden die nicht existieren
+(`contentDescriptionStartsWith`, `contentDescriptionMatches`). Diese erzeugen eine
+`InvalidSelectorException` statt `NoSuchElementException`. Der Retry-Catch-Block fing
+nur `NoSuchElementException` — der Loop brach sofort ab, keine weitere Chance für den LLM.
+
+**Fix** (`SelfHealingAppiumDriver.attemptHealAndRetry`):
+- `catch (NoSuchElementException | InvalidSelectorException retryFail)` — beide Fälle
+  landen jetzt im Retry-Pfad und registrieren den schlechten Locator als rejected
+
+#### Bestätigte Post-Fix Ergebnisse (v2, alle 6 Szenarien)
+
+| Provider | Ergebnis | BottomSheet-Heilung |
+|----------|---------|-------------------|
+| Mistral | **6/6** ✅ | `leg_platform` attempt 2 → `accessibilityId: Gleis 9` |
+| Anthropic | **6/6** ✅ | `leg_train_number` attempt 3 → `descriptionContains("Zug ")` |
+| OpenAI | **6/6** ✅ | Direkt beim 1. Versuch korrekt |
+
+Alle drei Provider heilen jetzt zuverlässig alle 6 Szenarien, auch ohne Benchmark-Cache-Warmup.
 
 ---
 
@@ -269,5 +289,5 @@ Cache-Entry aus Szenario 1 vergiftet nicht mehr jedes Folge-Szenario mit demselb
 | Streaming | Aktuell kein Streaming (kein `message/stream`) — reicht für synchrone Heal-Calls |
 | Auth | Kein API-Key-Schutz auf dem A2A-Endpoint — für Unternehmenseinsatz erforderlich |
 | Discovery | Agent Card URL ist `server.port`-basiert — bei Reverse-Proxy anpassen |
-| BottomSheet-Failure | Mistral scheitert konsistent an `leg_platform` (Fahrplan-Details); Anthropic und OpenAI heilen erfolgreich via AccessibilityId/UIAutomator |
+| BottomSheet-Failure | ~~Offener Punkt~~ Behoben: alle drei Provider heilen 6/6 nach Retry-Bugfixes (siehe 5.4) |
 | Lokale Provider | Benchmark gegen Qwen3-30B, Devstral, Qwen3-Next erfordert laufenden LM Studio-Server auf Port 1234 |

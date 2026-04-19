@@ -105,10 +105,14 @@ public class SelfHealingAppiumDriver {
                     highlightHealedElement(result.healedLocatorExpression());
                     captureHealingScreenshot(failedLocator, result.healedLocator());
                     return element;
-                } catch (NoSuchElementException retryFail) {
-                    log.warn("Healed locator also failed: {} — retrying...", result.healedLocator());
-                    // Keep original failedLocator, record rejected heal so the next attempt
-                    // does not repeat the same non-existent suggestion.
+                } catch (NoSuchElementException | InvalidSelectorException retryFail) {
+                    // NoSuchElementException  — healed locator exists in syntax but element not on screen
+                    // InvalidSelectorException — healed locator is syntactically invalid (e.g. LLM invented a
+                    //   non-existent UIAutomator method like `contentDescriptionStartsWith`).
+                    // In both cases the suggestion is unusable: add it to rejectedLocators so the next LLM
+                    // call doesn't repeat it, and bypass the cache (handled in HealingOrchestrator).
+                    log.warn("Healed locator also failed: {} — {} — retrying...", result.healedLocator(),
+                            retryFail.getClass().getSimpleName());
                     context = context.withRejectedLocator(result.healedLocator());
                 }
             } else {
