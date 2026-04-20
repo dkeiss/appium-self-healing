@@ -4,7 +4,9 @@ import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.json.JsonMapper;
 import de.keiss.selfhealing.a2a.client.A2AClient;
 import de.keiss.selfhealing.a2a.client.A2ALocatorHealer;
+import de.keiss.selfhealing.core.agent.ChatClientTriageAgent;
 import de.keiss.selfhealing.core.healing.ChatClientLocatorHealer;
+import de.keiss.selfhealing.core.healing.ChatClientStepHealer;
 import de.keiss.selfhealing.core.model.FailureContext;
 import de.keiss.selfhealing.core.model.HealingResult;
 import org.junit.jupiter.api.Test;
@@ -84,6 +86,18 @@ class A2aRoundTripSmokeTest {
         @Bean
         public ChatClientLocatorHealer chatClientLocatorHealer() {
             return new RecordingStubHealer();
+        }
+
+        /** Stub — never called in this test; only needed for SelfHealingA2AController wiring. */
+        @Bean
+        public ChatClientTriageAgent chatClientTriageAgent() {
+            return new ChatClientTriageAgent(null);
+        }
+
+        /** Stub — never called in this test; only needed for SelfHealingA2AController wiring. */
+        @Bean
+        public ChatClientStepHealer chatClientStepHealer() {
+            return new ChatClientStepHealer(null, null);
         }
 
         @Bean

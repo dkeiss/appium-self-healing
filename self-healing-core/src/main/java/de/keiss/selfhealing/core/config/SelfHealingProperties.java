@@ -161,7 +161,7 @@ public record SelfHealingProperties(boolean enabled, int maxRetries, String llmP
             }
         }
 
-        public record Client(boolean enabled, String locatorHealerUrl, long requestTimeoutMs) {
+        public record Client(boolean enabled, String serverUrl, long requestTimeoutMs) {
 
             public Client {
                 if (requestTimeoutMs <= 0)

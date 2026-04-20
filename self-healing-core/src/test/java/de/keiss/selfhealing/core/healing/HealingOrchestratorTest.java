@@ -170,12 +170,11 @@ class HealingOrchestratorTest {
 
     // --- Test doubles ----------------------------------------------------------------
 
-    private static final class StubTriageAgent extends TriageAgent {
+    private static final class StubTriageAgent implements TriageAgent {
 
         private final TriageResult fixed;
 
         StubTriageAgent(FailureCategory category, String reasoning, double confidence) {
-            super(null);
             this.fixed = new TriageResult(category, reasoning, confidence);
         }
 
