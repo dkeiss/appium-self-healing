@@ -240,4 +240,4 @@ spring:
 
 self-healing:
   prompt:
-    max-page-source-chars: 6000  # GLM-4.7-Flash loads with n_ctx=4096 by default; keep prompt ≤ 3500 tokens
+    max-page-source-chars: 0  # 0 = kein Truncating — vollständiges XML an GLM übergeben
