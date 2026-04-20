@@ -1,8 +1,10 @@
 package de.keiss.selfhealing.a2a.dto;
 
 import de.keiss.selfhealing.core.healing.LocatorFactory;
+import de.keiss.selfhealing.core.healing.StepHealingResult;
 import de.keiss.selfhealing.core.model.FailureContext;
 import de.keiss.selfhealing.core.model.HealingResult;
+import de.keiss.selfhealing.core.model.TriageResult;
 import org.openqa.selenium.By;
 import org.openqa.selenium.SearchContext;
 import org.openqa.selenium.WebElement;
@@ -81,6 +83,25 @@ public final class DtoMapper {
             value = value.substring(1, value.length() - 1);
         }
         return new String[]{method, value};
+    }
+
+    public static TriageResultDto toDto(TriageResult result) {
+        return new TriageResultDto(result.category().name(), result.reasoning(), result.confidence());
+    }
+
+    public static TriageResult fromDto(TriageResultDto dto) {
+        return new TriageResult(TriageResult.FailureCategory.valueOf(dto.category()), dto.reasoning(),
+                dto.confidence());
+    }
+
+    public static StepHealingResultDto toDto(StepHealingResult result) {
+        return new StepHealingResultDto(result.success(), result.fixedMethodSource(), result.fixedPageObjectSource(),
+                result.explanation(), result.requiresNewStep(), result.newStepSuggestion(), result.healingDurationMs());
+    }
+
+    public static StepHealingResult fromDto(StepHealingResultDto dto) {
+        return new StepHealingResult(dto.success(), dto.fixedMethodSource(), dto.fixedPageObjectSource(),
+                dto.explanation(), dto.requiresNewStep(), dto.newStepSuggestion(), dto.healingDurationMs());
     }
 
     /**

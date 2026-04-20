@@ -1,5 +1,6 @@
 package de.keiss.selfhealing.core.config;
 
+import de.keiss.selfhealing.core.agent.ChatClientTriageAgent;
 import de.keiss.selfhealing.core.agent.TriageAgent;
 import de.keiss.selfhealing.core.git.AutoFixPrCreator;
 import de.keiss.selfhealing.core.git.GitHubPrService;
@@ -10,6 +11,7 @@ import de.keiss.selfhealing.core.prompt.StepPromptCreator;
 import de.keiss.selfhealing.core.prompt.TriagePromptCreator;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.tool.ToolCallbackProvider;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.ApplicationEventPublisher;
@@ -25,8 +27,14 @@ import java.nio.file.Path;
 public class SelfHealingAutoConfiguration {
 
     @Bean
-    public TriageAgent triageAgent(ChatClient.Builder chatClientBuilder) {
-        return new TriageAgent(chatClientBuilder.build());
+    public ChatClientTriageAgent chatClientTriageAgent(ChatClient.Builder chatClientBuilder) {
+        return new ChatClientTriageAgent(chatClientBuilder.build());
+    }
+
+    @Bean
+    @ConditionalOnMissingBean(TriageAgent.class)
+    public TriageAgent triageAgent(ChatClientTriageAgent chatClientTriageAgent) {
+        return chatClientTriageAgent;
     }
 
     @Bean
@@ -63,14 +71,21 @@ public class SelfHealingAutoConfiguration {
      * over transparently.
      */
     @Bean
-    @org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean(LocatorHealer.class)
+    @ConditionalOnMissingBean(LocatorHealer.class)
     public LocatorHealer locatorHealer(ChatClientLocatorHealer chatClientLocatorHealer) {
         return chatClientLocatorHealer;
     }
 
     @Bean
-    public StepHealer stepHealer(ChatClient.Builder chatClientBuilder, SelfHealingProperties properties) {
-        return new StepHealer(chatClientBuilder.build(), properties);
+    public ChatClientStepHealer chatClientStepHealer(ChatClient.Builder chatClientBuilder,
+            SelfHealingProperties properties) {
+        return new ChatClientStepHealer(chatClientBuilder.build(), properties);
+    }
+
+    @Bean
+    @ConditionalOnMissingBean(StepHealer.class)
+    public StepHealer stepHealer(ChatClientStepHealer chatClientStepHealer) {
+        return chatClientStepHealer;
     }
 
     @Bean
@@ -80,9 +95,15 @@ public class SelfHealingAutoConfiguration {
 
     @Bean
     @ConditionalOnProperty(prefix = "self-healing.mcp", name = "enabled", havingValue = "true")
-    public McpContextEnricher mcpContextEnricher(ChatClient.Builder chatClientBuilder,
+    public ChatClientMcpContextEnricher chatClientMcpContextEnricher(ChatClient.Builder chatClientBuilder,
             org.springframework.beans.factory.ObjectProvider<ToolCallbackProvider> mcpToolProvider) {
-        return new McpContextEnricher(chatClientBuilder.build(), mcpToolProvider);
+        return new ChatClientMcpContextEnricher(chatClientBuilder.build(), mcpToolProvider);
+    }
+
+    @Bean
+    @ConditionalOnProperty(prefix = "self-healing.mcp", name = "enabled", havingValue = "true")
+    public McpContextEnricher mcpContextEnricher(ChatClientMcpContextEnricher chatClientMcpContextEnricher) {
+        return chatClientMcpContextEnricher;
     }
 
     @Bean

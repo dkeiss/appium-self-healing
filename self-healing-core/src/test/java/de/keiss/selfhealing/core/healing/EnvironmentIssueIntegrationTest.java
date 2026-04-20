@@ -170,15 +170,13 @@ class EnvironmentIssueIntegrationTest {
     // --- Test doubles ----------------------------------------------------------------
 
     /**
-     * Stub TriageAgent that bypasses the LLM entirely. The superclass ChatClient is passed {@code null} — it is never
-     * dereferenced because {@link #analyze(FailureContext)} is overridden.
+     * Stub TriageAgent that bypasses the LLM entirely.
      */
-    private static final class StubTriageAgent extends TriageAgent {
+    private static final class StubTriageAgent implements TriageAgent {
 
         private final TriageResult fixed;
 
         StubTriageAgent(FailureCategory category, String reasoning, double confidence) {
-            super(null);
             this.fixed = new TriageResult(category, reasoning, confidence);
         }
 
