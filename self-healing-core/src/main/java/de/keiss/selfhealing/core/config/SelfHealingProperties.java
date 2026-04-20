@@ -115,11 +115,12 @@ public record SelfHealingProperties(boolean enabled, int maxRetries, String llmP
      * with large context windows. Local models loaded with a small {@code n_ctx} (e.g. 4 096) will hit a 400 error
      * from LM Studio if the total prompt exceeds the context length. Setting this to ≈ 6 000 keeps the healer prompt
      * well within 4 096 tokens while still exposing all top-level UI elements the LLM needs.
+     * Set to {@code 0} to disable truncation entirely (pass the full page source regardless of size).
      */
     public record Prompt(int maxPageSourceChars) {
 
         public Prompt {
-            if (maxPageSourceChars <= 0)
+            if (maxPageSourceChars < 0)
                 maxPageSourceChars = 15_000;
         }
 

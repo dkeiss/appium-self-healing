@@ -36,7 +36,7 @@ public class ChatClientLocatorHealer implements LocatorHealer {
         log.info("LocatorHealer attempting to heal: {}", context.failedLocator());
 
         try {
-            int maxPageSourceChars = properties.prompt().maxPageSourceChars();
+            int maxPageSourceChars = properties.prompt().maxPageSourceChars(); // 0 = unlimited
             var promptCreator = new LocatorPromptCreator(maxPageSourceChars);
             boolean useVision = properties.vision().enabled() && context.screenshot() != null
                     && context.screenshot().length > 0;

@@ -23,7 +23,8 @@ public class LocatorPromptCreator {
     }
 
     public LocatorPromptCreator(int maxPageSourceChars) {
-        this.maxPageSourceChars = maxPageSourceChars > 0 ? maxPageSourceChars : DEFAULT_MAX_PAGE_SOURCE_CHARS;
+        // 0 = unlimited (no truncation); negative falls back to default
+        this.maxPageSourceChars = maxPageSourceChars >= 0 ? maxPageSourceChars : DEFAULT_MAX_PAGE_SOURCE_CHARS;
     }
 
     public String createSystemPrompt() {
@@ -142,12 +143,12 @@ public class LocatorPromptCreator {
 
     /**
      * Truncate XML intelligently — keep the root structure and trim deep nesting, so the LLM always sees the top-level
-     * layout.
+     * layout. Pass {@code maxLength = 0} to disable truncation entirely.
      */
     private String smartTruncateXml(String xml, int maxLength) {
         if (xml == null)
             return "";
-        if (xml.length() <= maxLength)
+        if (maxLength <= 0 || xml.length() <= maxLength)
             return xml;
 
         // Keep first 70% and last 15% to preserve both header and footer of the hierarchy

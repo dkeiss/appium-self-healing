@@ -215,7 +215,7 @@ spring:
 
 self-healing:
   prompt:
-    max-page-source-chars: 6000  # Qwen3-30B loads with n_ctx=4096 by default; keep prompt ≤ 3500 tokens
+    max-page-source-chars: 0  # 0 = kein Truncating — vollständiges XML an Qwen3 übergeben
 
 ---
 spring:
