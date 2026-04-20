@@ -28,6 +28,25 @@ if [ ! -f "android-app/app/build/outputs/apk/v1/debug/app-v1-debug.apk" ]; then
     cd android-app && ./gradlew assembleV1Debug assembleV2Debug --no-daemon && cd ..
 fi
 
+# ─── Detect LM Studio host IP for local LLM providers ───────────────
+# On Windows with Podman (WSL2), containers run inside the Podman
+# machine and cannot resolve host.docker.internal automatically.
+# We detect the vEthernet (WSL) adapter IP and export LM_STUDIO_URL
+# so docker-compose passes the concrete IP into the container instead
+# of the unresolvable hostname.
+if [ -z "$LM_STUDIO_URL" ]; then
+    # Try ipconfig (Windows/Git-Bash) first, fall back to hostname -I (WSL)
+    WSL_HOST_IP=$(ipconfig 2>/dev/null \
+        | awk '/WSL/{found=1} found && /IPv4/{match($0,/[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+/); if(RLENGTH>0){print substr($0,RSTART,RLENGTH); exit}}')
+    if [ -n "$WSL_HOST_IP" ]; then
+        export LM_STUDIO_URL="http://${WSL_HOST_IP}:1234"
+        echo "LM Studio URL (auto-detected WSL host): $LM_STUDIO_URL"
+    else
+        export LM_STUDIO_URL="http://host.docker.internal:1234"
+        echo "LM Studio URL (fallback): $LM_STUDIO_URL"
+    fi
+fi
+
 echo "╔══════════════════════════════════════════════════╗"
 echo "║  Appium Self-Healing Test Runner (Podman)        ║"
 echo "║  App Version: $APP_VERSION                       ║"

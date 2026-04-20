@@ -5,7 +5,7 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 @ConfigurationProperties(prefix = "self-healing")
 public record SelfHealingProperties(boolean enabled, int maxRetries, String llmProvider, String sourceBasePath,
         Triage triage, Mcp mcp, Vision vision, Cache cache, EnvironmentCheck environmentCheck, BugReports bugReports,
-        GitPr gitPr, A2a a2a) {
+        GitPr gitPr, A2a a2a, Prompt prompt) {
 
     public SelfHealingProperties {
         if (maxRetries <= 0)
@@ -28,6 +28,8 @@ public record SelfHealingProperties(boolean enabled, int maxRetries, String llmP
             gitPr = GitPr.defaults();
         if (a2a == null)
             a2a = A2a.defaults();
+        if (prompt == null)
+            prompt = Prompt.defaults();
     }
 
     public record Triage(boolean enabled) {
@@ -104,6 +106,25 @@ public record SelfHealingProperties(boolean enabled, int maxRetries, String llmP
 
         public static GitPr defaults() {
             return new GitPr(false, false, "origin", "main", "fix/self-healing-", null, null, null);
+        }
+    }
+
+    /**
+     * Prompt-construction tuning. The main knob is {@code maxPageSourceChars} — it caps how many characters of the
+     * Appium XML page source are included in the heal prompt. The default (15 000) is generous enough for cloud LLMs
+     * with large context windows. Local models loaded with a small {@code n_ctx} (e.g. 4 096) will hit a 400 error
+     * from LM Studio if the total prompt exceeds the context length. Setting this to ≈ 6 000 keeps the healer prompt
+     * well within 4 096 tokens while still exposing all top-level UI elements the LLM needs.
+     */
+    public record Prompt(int maxPageSourceChars) {
+
+        public Prompt {
+            if (maxPageSourceChars <= 0)
+                maxPageSourceChars = 15_000;
+        }
+
+        public static Prompt defaults() {
+            return new Prompt(15_000);
         }
     }
 

@@ -160,7 +160,7 @@ class HealingOrchestratorTest {
     private static SelfHealingProperties propertiesWithCache(boolean cacheEnabled) {
         return new SelfHealingProperties(true, 3, "anthropic", null, new Triage(true), new Mcp(false),
                 new Vision(false), new Cache(cacheEnabled), EnvironmentCheck.defaults(), BugReports.defaults(), null,
-                null);
+                null, null);
     }
 
     private static FailureContext failureContextForLocator(By locator) {

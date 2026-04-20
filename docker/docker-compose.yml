@@ -80,6 +80,11 @@ services:
       APP_APK_PATH: "/app/apks/${APP_VERSION:-v1}/debug/app-${APP_VERSION:-v1}-debug.apk"
       APP_VERSION: "${APP_VERSION:-v1}"
       LM_STUDIO_URL: "${LM_STUDIO_URL:-http://host.docker.internal:1234}"
+    extra_hosts:
+      # Podman on WSL2 does not inject host.docker.internal automatically.
+      # host-gateway resolves to the container's default route (Windows host IP),
+      # matching the behaviour Docker Desktop provides out of the box.
+      - "host.docker.internal:host-gateway"
     volumes:
       - ../build/reports:/app/integration-tests/build/reports
       - ../android-app/app/build/outputs/apk:/app/apks:ro
@@ -105,6 +110,8 @@ services:
       BACKEND_URL: "http://backend:8080"
       APP_APK_PATH: "/app/apks/v2/debug/app-v2-debug.apk"
       LM_STUDIO_URL: "${LM_STUDIO_URL:-http://host.docker.internal:1234}"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     env_file:
       - .env
     volumes:
@@ -158,6 +165,8 @@ services:
       SELF_HEALING_CACHE_ENABLED: "false"
       APPIUM_MCP_HOST: "android-emulator"
       APPIUM_MCP_PORT: "4723"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     env_file:
       - .env
     volumes:
