@@ -5,8 +5,27 @@ import de.keiss.selfhealing.core.model.FailureContext;
 /**
  * Creates optimized prompts for Appium mobile locator healing. Includes Appium-specific guidance for XML page source
  * analysis.
+ *
+ * <p>The {@code maxPageSourceChars} constructor parameter caps the page-source XML that is embedded in the user
+ * prompt. The default (15 000 chars) suits cloud LLMs with large context windows. Set it lower (e.g. 6 000) for local
+ * models loaded with a small {@code n_ctx} — LM Studio returns HTTP 400 when the prompt token count exceeds the
+ * model's context length.
  */
 public class LocatorPromptCreator {
+
+    /** Default: generous limit for cloud LLMs. */
+    private static final int DEFAULT_MAX_PAGE_SOURCE_CHARS = 15_000;
+
+    private final int maxPageSourceChars;
+
+    public LocatorPromptCreator() {
+        this(DEFAULT_MAX_PAGE_SOURCE_CHARS);
+    }
+
+    public LocatorPromptCreator(int maxPageSourceChars) {
+        // 0 = unlimited (no truncation); negative falls back to default
+        this.maxPageSourceChars = maxPageSourceChars >= 0 ? maxPageSourceChars : DEFAULT_MAX_PAGE_SOURCE_CHARS;
+    }
 
     public String createSystemPrompt() {
         return """
@@ -103,7 +122,7 @@ public class LocatorPromptCreator {
 
         if (context.pageSourceXml() != null) {
             sb.append("## Current Page Source (Appium XML)\n```xml\n");
-            sb.append(smartTruncateXml(context.pageSourceXml(), 15000)).append("\n```\n\n");
+            sb.append(smartTruncateXml(context.pageSourceXml(), this.maxPageSourceChars)).append("\n```\n\n");
         }
 
         sb.append("## Page Object Class: ").append(context.pageObjectClassName()).append("\n```java\n");
@@ -124,12 +143,12 @@ public class LocatorPromptCreator {
 
     /**
      * Truncate XML intelligently — keep the root structure and trim deep nesting, so the LLM always sees the top-level
-     * layout.
+     * layout. Pass {@code maxLength = 0} to disable truncation entirely.
      */
     private String smartTruncateXml(String xml, int maxLength) {
         if (xml == null)
             return "";
-        if (xml.length() <= maxLength)
+        if (maxLength <= 0 || xml.length() <= maxLength)
             return xml;
 
         // Keep first 70% and last 15% to preserve both header and footer of the hierarchy

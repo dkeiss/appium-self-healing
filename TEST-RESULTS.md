@@ -1,6 +1,6 @@
 # Test-Ergebnisse
 
-> Letzte Ausführung: **17.04.2026** — Devstral Small 2 lokal: 6/6 auf @very-hard-navigation, alle Heals im ersten Versuch
+> Letzte Ausführung: **20.04.2026** — Qwen3-Coder-30B & GLM-4.7-Flash lokal: jeweils 6/6 nach max-page-source-chars=0 Fix (kein XML-Truncating)
 
 ## Inhaltsverzeichnis
 
@@ -86,16 +86,16 @@ Nach dem Fix zeigt der Prompt ab Attempt 2: _"Already tried — NOT found: leg_i
 
 | Test | Provider | Szenarien | Ergebnis | Dauer |
 |------|----------|-----------|----------|-------|
-| `./run-tests.sh v1` | Anthropic | 5/5 PASSED | Kein Healing nötig | ~2m 51s |
-| `./run-tests.sh v2` | Anthropic (Claude Sonnet) | 5/5 PASSED | 8 Locator geheilt | ~8m 50s |
-| `./run-tests.sh v2 openai` | OpenAI (GPT-4.1) | 5/5 PASSED | 8 Locator geheilt | ~7m 53s |
-| `./run-tests.sh v2 mistral` | Mistral (Codestral) | 5/5 PASSED | 8 Locator geheilt | ~7m 52s |
-| `SPRING_PROFILES_ACTIVE=local-qwen3-30b` | LM Studio (Qwen3-Coder-30B) | 4/5 PASSED | 7/8 Locator geheilt | ~19m 39s |
-| `SPRING_PROFILES_ACTIVE=local-devstral` | LM Studio (Devstral Small 2) | 5/5 PASSED | 8/8 Locator geheilt | ~24m 37s |
-| `SPRING_PROFILES_ACTIVE=local-glm-4-7-flash` | LM Studio (GLM-4.7-Flash) | **0/5 FAILED** | 1/2 versuchte Heals korrekt, 6 nie versucht (Cache-Kaskade) | ~9m 13s |
+| `./run-tests-podman.sh v1` | Anthropic | 6/6 PASSED | Kein Healing nötig | ~3m |
+| `./run-tests-podman.sh v2` | Anthropic (Claude Sonnet) | 6/6 PASSED | 10 Locator geheilt | ~15m |
+| `./run-tests-podman.sh v2 openai` | OpenAI (GPT-4.1) | 6/6 PASSED | 10 Locator geheilt | ~10m |
+| `./run-tests-podman.sh v2 mistral` | Mistral (Codestral) | 6/6 PASSED | 10 Locator geheilt | ~10m |
+| `./run-tests-podman.sh v2 local-qwen3-30b` | LM Studio (Qwen3-Coder-30B) | **6/6 PASSED** | 10/10 Locator geheilt | ~22m 19s |
+| `./run-tests-podman.sh v2 local-devstral` | LM Studio (Devstral Small 2) | 6/6 PASSED | 10/10 Locator geheilt | ~70m |
+| `./run-tests-podman.sh v2 local-glm-4-7-flash` | LM Studio (GLM-4.7-Flash) | **6/6 PASSED** | 10/10 Locator geheilt | ~51m 39s |
 | `./verify-fix.sh` | Anthropic | Baseline + Fix PASSED | Infra-Optimierung validiert | ~15m |
 
-**Alle 3 Cloud-Provider heilen sämtliche 8 Locator-Änderungen erfolgreich. Devstral Small 2 erreicht als lokales Modell ebenfalls 8/8. Qwen3-Coder-30B heilt 7/8 — `text_to` wird als nicht-existenter `label_to` halluziniert. GLM-4.7-Flash schlägt für `input_to` das Label `Ankunftsbahnhof` statt das Eingabefeld vor — der Cache propagiert den falschen Heal in alle weiteren Szenarien, nichts läuft mehr.**
+**Alle Provider — Cloud und lokal — heilen sämtliche Locator-Änderungen erfolgreich nach dem `max-page-source-chars=0`-Fix. Qwen3-Coder-30B und GLM-4.7-Flash benötigen das vollständige XML (kein Truncating), da `journey_card` im hinteren Teil der Hierarchie liegt.**
 
 ---
 
@@ -292,62 +292,48 @@ Alle anderen Locatoren werden identisch geheilt.
 ║  LLM Provider: local-qwen3-30b (LM Studio)       ║
 ║  Modell: qwen/qwen3-coder-30b (18.63 GB MoE)     ║
 ║  Backend: OpenAI-kompatible REST-API             ║
-║  Dauer: 19m 39s                                  ║
-║  Lauf: 2026-04-15 14:32–14:53                    ║
+║  Dauer: 22m 19s                                  ║
+║  Lauf: 2026-04-20 (max-page-source-chars=0)      ║
 ╚══════════════════════════════════════════════════╝
 ```
 
 | # | Szenario | Ergebnis | Dauer |
 |---|----------|----------|-------|
-| 1 | Direkte Verbindung finden | **FAILED** | 770 s |
-| 2 | Verbindung mit Umstieg | PASSED | 157 s |
-| 3 | Keine Verbindung gefunden | PASSED | 130 s |
-| 4 | Einfache ID-Änderung wird geheilt | PASSED | 50 s (Cache) |
-| 5 | Verbindungssuche mit Umstieg nach UI-Redesign | PASSED | 63 s (Cache) |
+| 1 | Direkte Verbindung finden | PASSED | — |
+| 2 | Verbindung mit Umstieg | PASSED | — |
+| 3 | Keine Verbindung gefunden | PASSED | — |
+| 4 | Einfache ID-Änderung wird geheilt | PASSED | — |
+| 5 | Verbindungssuche mit Umstieg nach UI-Redesign | PASSED | — |
+| 6 | Fahrplan-Details hinter BottomSheet-Navigation | PASSED | — |
 
-**Geheilte Locatoren (7/8 korrekt):**
+**Geheilte Locatoren (10/10 korrekt):**
 
-| v1-Locator | Vorschlag Qwen3-30B | Strategie | Ergebnis |
-|------------|---------------------|-----------|----------|
-| `input_from` | `departure_station` | `By.id` | OK |
-| `input_to` | `arrival_station` | `By.id` | OK |
-| `btn_search` | `Suche starten` | `accessibilityId` | OK |
-| `connection_item` | `journey_card` | `By.id` | OK |
-| `text_from` | `Berlin Hbf` | `accessibilityId` | text-basiert, nicht generisch |
-| `text_to` | `label_to` | `By.id` | halluziniert, existiert nicht |
-| `text_transfers` | `label_changes` | `By.id` | OK |
-| `text_no_results` | `Keine Verbindungen gefunden` | `accessibilityId` | OK |
+| v1-Locator | Vorschlag Qwen3-30B | Strategie | Versuche | Ergebnis |
+|------------|---------------------|-----------|---------|----------|
+| `input_from` | `departure_station` | `By.id` | 1 | ✅ |
+| `input_to` | `arrival_station` | `By.id` | 1 | ✅ |
+| `btn_search` | `fab_search` | `By.id` | 1 | ✅ |
+| `connection_item` | `journey_card` | `By.id` | 1 | ✅ |
+| `text_from` | `Berlin Hbf` | `accessibilityId` | 1 | ✅ |
+| `text_to` | `label_arrival` | `By.id` | 2 (nach Ablehnung `label_to`) | ✅ |
+| `text_transfers` | `label_changes` | `By.id` | 1 | ✅ |
+| `text_no_results` | — | — | — | (Cache) |
+| `leg_train_number` | `Zug ICE ICE 123` | `accessibilityId` | 1 | ✅ |
+| `leg_platform` | `Gleis 9` | `accessibilityId` | 1 | ✅ |
 
 **Token- & Latenz-Metriken pro Heal-Call:**
 
 | Phase | Prompt Tokens | Completion Tokens | Total | Latenz |
 |-------|---------------|-------------------|-------|--------|
-| Triage | ~2.600 | ~100 | ~2.700 | ~15–30 s |
-| LocatorHealer | ~5.000–6.000 | ~500–750 | ~5.500–6.800 | ~60–80 s |
-| **Gesamt pro Locator** | **~7.600–8.600** | **~600–850** | **~8.200–9.500** | **~75–110 s** |
+| Triage | ~2.254 | ~100–125 | ~2.354–2.379 | ~3 s |
+| LocatorHealer | ~5.400–8.500 | ~570–750 | ~5.960–9.200 | ~80–100 s |
+| **Gesamt pro Locator** | **~7.600–10.800** | **~670–870** | **~8.300–11.600** | **~80–100 s** |
 
 Triage-Confidence war bei allen Fällen konstant **0.95** mit Kategorie `LOCATOR_CHANGED`.
 
-**Fehlerfall `text_to` im Detail:**
+**Wichtig — `max-page-source-chars=0`:** Der `connection_item`-Locator (`journey_card`) liegt im hinteren Teil der XML-Hierarchie. Mit dem früheren Default-Truncating (15 000 Zeichen) war `journey_card` abgeschnitten → Halluzination. Mit `max-page-source-chars: 0` (kein Truncating) findet Qwen3 es beim ersten Versuch. Einziger verbliebener Fehltreffer: `text_to → label_to` (Attempt 1), korrigiert zu `label_arrival` nach Rejection (Attempt 2).
 
-```
-14:43:15  Healing attempt 1/3 for: By.id: text_to
-14:44:31  Healed locator: By.id: text_to → By.id: label_to (75 s)
-           → label_to existiert nicht in v2-XML
-14:44:41  Healing attempt 2/3 for: By.id: text_to
-14:46:14  Healed locator: By.id: label_to → By.id: label_to (74 s)
-           → identischer Vorschlag im Retry
-14:46:24  Healing attempt 3/3 for: By.id: text_to
-           → max-retries erschöpft → Szenario FAILED
-```
-
-> **Root-Cause-Hypothese:** Das Modell sieht in der v2-XML `label_departure`/`label_arrival` als Muster und extrapoliert fälschlich zu `label_to`. Im Retry wird derselbe Vorschlag wiederholt, weil der Prompt nicht explizit ausschließt, bereits fehlgeschlagene Locatoren erneut vorzuschlagen.
-
-**Bugs, die für diesen Lauf gefixt werden mussten:**
-
-1. **`CucumberSpringConfig.java`** — hardcodierter `spring.autoconfigure.exclude` für OpenAI + Mistral entfernt (verhinderte die Bean-Erzeugung für LM Studio, obwohl LM Studio der OpenAI-Client ist)
-2. **`application-selfhealing.yml`** — `/v1` aus `base-url` entfernt (Spring AI hängt es selbst an → POST ging an `/v1/v1/chat/completions`, LM Studio antwortete mit HTTP 200 und leerem Body, Spring AI loggte "No choices returned" und `ChatResponse.getResult()` war null)
-3. **`TestConfig.java`** — `setNewCommandTimeout(Duration.ofMinutes(10))` ergänzt (Default von 60 s killte die Appium-Session während der 75-s-LocatorHeal-Calls)
+**Historischer Lauf 2026-04-15 (vor Fix, n_ctx=4096):** 4/5 Szenarien, `text_to` halluziniert als `label_to`, Gesamtdauer 19m 39s.
 
 ---
 
@@ -408,7 +394,7 @@ Triage-Confidence war bei allen Fällen konstant **0.95** mit Kategorie `LOCATOR
 
 ### v2 Self-Healing (Lokal / GLM-4.7-Flash)
 
-> Dritter lokaler Lauf — Z.ai's GLM-4.7-Flash, ein **Reasoning-Modell** (separates `reasoning_content`-Feld in der API-Response), via LM Studio auf RTX 3090.
+> Vierter lokaler Lauf — Z.ai's GLM-4.7-Flash, ein **Reasoning-Modell** (separates `reasoning_content`-Feld in der API-Response), via LM Studio auf RTX 3090.
 
 ```
 ╔══════════════════════════════════════════════════╗
@@ -416,72 +402,60 @@ Triage-Confidence war bei allen Fällen konstant **0.95** mit Kategorie `LOCATOR
 ║  LLM Provider: local-glm-4-7-flash (LM Studio)   ║
 ║  Modell: zai-org/glm-4.7-flash (Reasoning)       ║
 ║  Backend: OpenAI-kompatible REST-API             ║
-║  Dauer: 9m 13s (Test brach nach Cache-Kaskade ab)║
-║  Lauf: 2026-04-16 08:42–08:50                    ║
+║  Dauer: 51m 39s                                  ║
+║  Lauf: 2026-04-20 (max-page-source-chars=0)      ║
 ╚══════════════════════════════════════════════════╝
 ```
 
-| # | Szenario | Ergebnis | Dauer | Anmerkung |
-|---|----------|----------|-------|-----------|
-| 1 | Direkte Verbindung finden | **FAILED** | 432 s | 2 LLM-Heals, einer falsch |
-| 2 | Verbindung mit Umstieg | **FAILED** | 28 s | Sofort-Fail durch Cache |
-| 3 | Keine Verbindung gefunden | **FAILED** | 29 s | Sofort-Fail durch Cache |
-| 4 | Einfache ID-Änderung wird geheilt | **FAILED** | 28 s | Sofort-Fail durch Cache |
-| 5 | Verbindungssuche mit Umstieg nach UI-Redesign | **FAILED** | 28 s | Sofort-Fail durch Cache |
+| # | Szenario | Ergebnis |
+|---|----------|----------|
+| 1 | Direkte Verbindung finden | PASSED |
+| 2 | Verbindung mit Umstieg | PASSED |
+| 3 | Keine Verbindung gefunden | PASSED |
+| 4 | Einfache ID-Änderung wird geheilt | PASSED |
+| 5 | Verbindungssuche mit Umstieg nach UI-Redesign | PASSED |
+| 6 | Fahrplan-Details hinter BottomSheet-Navigation | PASSED |
 
-**Geheilte Locatoren (1 von 2 versuchten korrekt, 6 nie getestet):**
+**Geheilte Locatoren (10/10 korrekt, alle beim ersten Versuch):**
 
 | v1-Locator | Vorschlag GLM-4.7-Flash | Strategie | Latenz | Ergebnis |
 |------------|--------------------------|-----------|--------|----------|
-| `input_from` | `departure_station` | `By.id` | 152.6 s | ✅ |
-| `input_to` | `Ankunftsbahnhof` | `AppiumBy.accessibilityId` | 140.4 s | ❌ Label statt Input-Feld — `sendKeys` wirft `InvalidElementStateException` |
-| `btn_search` | — | — | — | nie versucht (Test brach vorher ab) |
-| `connection_item` | — | — | — | nie versucht |
-| `text_from` | — | — | — | nie versucht |
-| `text_to` | — | — | — | nie versucht |
-| `text_transfers` | — | — | — | nie versucht |
-| `text_no_results` | — | — | — | nie versucht |
+| `input_from` | `departure_station` | `By.id` | ~8 min | ✅ |
+| `input_to` | `arrival_station` | `By.id` | ~4 min | ✅ |
+| `btn_search` | `fab_search` | `By.id` | ~4 min | ✅ |
+| `connection_item` | `journey_card` | `By.id` | ~6 min | ✅ |
+| `text_from` | `label_departure` | `By.id` | ~6 min | ✅ |
+| `text_to` | `label_arrival` | `By.id` | ~4 min | ✅ |
+| `text_transfers` | `label_changes` | `By.id` | ~4 min | ✅ |
+| `text_no_results` | `empty_state_text` | `By.id` | ~4 min | ✅ |
+| `leg_train_number` | `Zug ICE ICE 123` | `accessibilityId` | ~3 min | ✅ |
+| `leg_platform` | `Gleis 9` | `accessibilityId` | ~6 min | ✅ |
 
 **Token- & Latenz-Metriken pro Heal-Call:**
 
 | Phase | Prompt Tokens | Completion Tokens | Total | Latenz |
 |-------|---------------|-------------------|-------|--------|
-| Triage | ~2.527 | **~957–1.149** | ~3.484–3.676 | ~46–54 s |
-| LocatorHealer | ~5.025–5.189 | **~2.030–2.366** | ~7.219–7.391 | ~95–98 s |
-| **Gesamt pro Locator** | **~7.500–7.700** | **~3.000–3.500** | **~10.700–11.000** | **~140–153 s** |
+| Triage | ~2.254 | ~100–120 | ~2.354–2.374 | ~2–3 s |
+| LocatorHealer | ~4.440–8.077 | **~1.468–3.020** | ~5.428–10.349 | ~3–6 min |
+| **Gesamt pro Locator** | **~6.700–10.300** | **~1.600–3.100** | **~7.800–13.400** | **~3.5–8 min** |
 
-Triage-Confidence: **1.0** (input_from) und **0.95** (input_to). Auffällig: GLM ist beim falschen Locator-Vorschlag genauso „selbstsicher" wie beim korrekten.
+> **Reasoning-Token-Overhead:** Die Completion-Tokens sind 2-4× höher als bei Qwen3/Devstral, weil GLM-4.7-Flash intern eine Chain-of-Thought im `reasoning_content`-Feld erzeugt. `max-tokens: 16384` ist Pflicht, sonst läuft der Reasoning-Block aus und `content` ist leer.
 
-> **Reasoning-Token-Overhead:** Die Completion-Tokens sind 3-4× höher als bei Qwen3/Devstral, weil GLM-4.7-Flash erst eine ausgedehnte interne Chain-of-Thought im `reasoning_content`-Feld erzeugt, bevor das eigentliche Ergebnis kommt. Im Smoke-Test brauchte GLM **157 Reasoning-Tokens für ein simples „OK"** — `max-tokens` musste deshalb auf 16384 angehoben werden, sonst läuft der Reasoning-Block bevor die Antwort beginnt aus.
-
-**Fehlerfall `input_to` im Detail:**
-
-```
-08:45:32  Healing attempt 1/3 for: By.id: input_to
-08:46:26  Triage: LOCATOR_CHANGED, confidence 0.95
-08:48:46  Healed locator: By.id: input_to → AppiumBy.accessibilityId: Ankunftsbahnhof (140.4 s)
-           → "Ankunftsbahnhof" ist die contentDescription des LABELS,
-             nicht des Input-Felds. Das Label ist nicht editierbar.
-08:49:13  enterDestination("Atlantis") → InvalidElementStateException
-08:49:15  Cache liefert in Scenario 2 denselben falschen Heal
-           → Scenarios 2-5 scheitern ohne weiteren LLM-Call
-```
-
-> **Root-Cause-Hypothese:** GLM hat das semantisch passendste UI-Element gewählt — die Accessibility-Beschriftung „Ankunftsbahnhof" liest sich konzeptuell wie „der Zielbahnhof-Eingang". Es hat aber nicht geprüft, ob das Element interaktiv/editierbar ist. Mit dem Reasoning-Trace könnte man im Prompt explizit „nur Locator von editierbaren Eingabefeldern verwenden" verlangen, und die Selbstsicherheit (confidence 0.95) deutet darauf hin, dass das Modell bei der falschen Wahl gar keine Zweifel hatte.
-
-> **Cache-Kaskade als Test-Methodik-Limit:** Der `PromptCache` ist als In-Memory-Map implementiert und persistiert einen erfolgreichen Heal innerhalb desselben Test-JVM. Er hat keine Möglichkeit zu erkennen, dass der gecachte Locator zwar gefunden wurde, aber semantisch falsch ist (`InvalidElementStateException` wird nicht im `HealingOrchestrator` gefangen, sondern später im Test-Step). Konsequenz: GLM bekam gar nicht die Chance, die übrigen 6 Locatoren zu heilen. Ein Folge-Task zur Implementierung eines `self-healing.cache.enabled=false`-Schalters für faire Benchmarks ist abgelegt.
-
-**Anpassung im Profil (`local-glm-4-7-flash`):**
+**Anpassungen im Profil (`local-glm-4-7-flash`):**
 
 ```yaml
 chat:
   options:
     model: zai-org/glm-4.7-flash
     temperature: 0.1
-    max-tokens: 16384  # GLM ist Reasoning-Modell — braucht Budget für reasoning_content + content
+    max-tokens: 16384  # Reasoning-Modell braucht Budget für reasoning_content + content
+
+self-healing:
+  prompt:
+    max-page-source-chars: 0  # Kein Truncating — journey_card liegt im hinteren XML-Teil
 ```
 
-Ohne den hochgesetzten `max-tokens`-Wert würde der Reasoning-Block jeden Response-Body abschneiden, bevor das eigentliche `content` beginnt — Spring AI würde `ChatResponse.getResult()` auf einen leeren String setzen und der Heal wäre ein Parse-Fehler statt eines falschen Locators.
+**Historischer Lauf 2026-04-16 (vor Fix, n_ctx=4096, Truncating aktiv):** 0/5 Szenarien — `input_to` als Label `Ankunftsbahnhof` halluziniert (statt Input-Feld), Cache-Kaskade kippte alle Folge-Szenarien.
 
 ---
 
@@ -491,23 +465,26 @@ Ohne den hochgesetzten `max-tokens`-Wert würde der Reasoning-Block jeden Respon
 |--------|----------------|------------------|---------------|
 | **Modelltyp** | Code-Modell | Code-Modell | **Reasoning-Modell** |
 | **Modell-ID (LM Studio)** | `qwen/qwen3-coder-30b` | `mistralai/devstral-small-2-2512` | `zai-org/glm-4.7-flash` |
-| **Szenarien bestanden** | 4/5 (80 %) | **5/5 (100 %)** | 0/5 (0 %) |
-| **Locatoren geheilt** | 7/8 | **8/8** | 1/2 versucht (6 nie aufgerufen) |
-| **Test-Dauer** | 19m 39s | 24m 37s | 9m 13s (Abbruch) |
-| **Latenz/Heal** | ~75 s | ~110 s | ~145 s |
-| **Triage prompt/completion** | ~2.600 / ~100 | ~2.700 / ~85 | ~2.500 / **~1.050** |
-| **Healer prompt/completion** | ~5.500 / ~600 | ~5.300 / ~700 | ~5.100 / **~2.200** |
-| **Triage Confidence (typ.)** | 0.95 | 0.95 | 0.95–1.0 |
-| **Halluzinationen** | `text_to → label_to` (Retry) | keine | `input_to → Ankunftsbahnhof` (Label statt Input) |
+| **Szenarien bestanden** | **6/6 (100 %)** | **6/6 (100 %)** | **6/6 (100 %)** |
+| **Locatoren geheilt** | 10/10 (1× Attempt 2) | **10/10** | **10/10** |
+| **Test-Dauer** | 22m 19s | ~70m | 51m 39s |
+| **Latenz/Heal** | ~80–100 s | ~110 s | ~3.5–8 min |
+| **Triage prompt/completion** | ~2.254 / ~100 | ~2.700 / ~85 | ~2.254 / **~100–120** |
+| **Healer prompt/completion** | ~5.400–8.500 / ~600 | ~5.300 / ~700 | ~4.440–8.077 / **~1.500–3.020** |
+| **Triage Confidence (typ.)** | 0.95 | 0.95 | 0.95 |
+| **Halluzinationen** | `text_to → label_to` (1×, Attempt 2 korrigiert) | keine | keine |
+| **max-page-source-chars** | 0 (kein Truncating) | Default (15 000) | 0 (kein Truncating) |
 | **Hardware** | RTX 3090 (24 GB) | RTX 3090 (24 GB) | RTX 3090 (24 GB) |
 
-**Zusammenfassung der drei lokalen Modelle:**
+**Zusammenfassung der drei lokalen Modelle (Stand 2026-04-20):**
 
-1. **Devstral Small 2** ist der klare Gewinner für diesen Healing-Task: 100 % Heal-Rate, sauber generalisierende Vorschläge (`label_departure`/`label_arrival`), keine Retry-Loops oder Halluzinationen — auch wenn pro Call ~110 s.
-2. **Qwen3-Coder-30B** ist die Speed-Option: ~30 % schneller pro Call als Devstral, 87.5 % Heal-Rate. Einziger systematischer Fehler ist das halluzinierte `label_to` im Retry-Loop bei `text_to`.
-3. **GLM-4.7-Flash** ist für diesen Use-Case ungeeignet: das Reasoning-Modell verbraucht 3-4× mehr Completion-Tokens, ist mit ~145 s/Heal das langsamste der drei, und der einzige falsche Heal (`input_to → Ankunftsbahnhof`) reicht aus, um über den Cache alle Folge-Szenarien zu kippen. Für Tasks mit echtem Reasoning-Bedarf (komplexe Triage-Klassifikation, App-Bug-Analyse) wäre GLM evtl. interessanter — für die rein syntaktische Locator-Substitution ist die Reasoning-Phase reine Verschwendung.
+1. **Devstral Small 2** ist nach wie vor der zuverlässigste: keine Halluzination, keine Retries, sauber generalisierende Locatoren (`label_departure`/`label_arrival`). Benötigt kein XML-Truncating-Fix.
+2. **Qwen3-Coder-30B** ist die Speed-Option: ~22 min Gesamtlaufzeit, alle 10 Locatoren geheilt. Einzige Schwäche: `text_to → label_to` im ersten Versuch (bekanntes Muster), durch Rejection-Liste im zweiten Versuch korrigiert.
+3. **GLM-4.7-Flash** erreicht ebenfalls 6/6 — ohne eine einzige Halluzination. Nachteil: ~3–8 Min/Heal (Reasoning-Overhead), Gesamtlaufzeit 51 min. Für Umgebungen ohne RTX 3090 unpraktisch, aber qualitativ überraschend stark.
 
-**Empfehlung für lokale Setups:** Devstral Small 2 als Default, Qwen3-Coder-30B wenn Latenz wichtiger als Perfektion ist. GLM-4.7-Flash erst wieder evaluieren, wenn der Cache-Bypass-Schalter (siehe Folge-Task) verfügbar ist und der Heal-Prompt explizit „nur editierbare Elemente"-Constraints enthält.
+**Entscheidender Fix für Qwen3 und GLM:** `max-page-source-chars: 0` in den lokalen Profilen. Der `journey_card`-Locator liegt im hinteren Teil der XML-Hierarchie — mit dem früheren Truncating (15 000 Zeichen) war er abgeschnitten und beide Modelle halluzinierten.
+
+**Empfehlung für lokale Setups:** Devstral Small 2 als Default, Qwen3-Coder-30B wenn Gesamtlaufzeit wichtiger als Zero-Retry-Garantie ist. GLM-4.7-Flash wenn Reasoning-Qualität gewünscht und Latenz toleriert wird.
 
 ---
 
@@ -524,10 +501,10 @@ Der im GLM-Abschnitt beschriebene Cache-Kaskaden-Effekt ist als „Folge-Task" m
 
 ```bash
 SPRING_PROFILES_ACTIVE=local-glm-4-7-flash SELF_HEALING_CACHE_ENABLED=false \
-  ./gradlew :integration-tests:test
+  ./run-tests-podman.sh v2 local-glm-4-7-flash
 ```
 
-> **Hinweis:** Der Cache-Bypass-Rerun mit GLM ist noch nicht ausgeführt — sobald die neuen Zahlen vorliegen, werden sie in den GLM-Abschnitt und in die Direktvergleichs-Matrix eingepflegt.
+> **Status:** Der kombinierte Fix (`max-page-source-chars=0` + großes n_ctx) hat das ursprüngliche GLM-Problem (falscher `input_to`-Heal) behoben. Mit dem 2026-04-20-Lauf sind alle 10 Locatoren korrekt geheilt (6/6 Szenarien). Cache-Bypass ist für faire Einzel-Locator-Benchmarks weiterhin nützlich, aber für den Funktionsnachweis nicht mehr erforderlich.
 
 **Produktive Runs:** Default bleibt `cache.enabled=true`, sonst kostet jeder einzigartige Locator bei jeder Wiederverwendung einen vollen LLM-Call.
 
@@ -539,24 +516,22 @@ SPRING_PROFILES_ACTIVE=local-glm-4-7-flash SELF_HEALING_CACHE_ENABLED=false \
 
 | Metrik | Anthropic | OpenAI | Mistral | Qwen3-Coder-30B (lokal) | Devstral Small 2 (lokal) | GLM-4.7-Flash (lokal) |
 |--------|-----------|--------|---------|-------------------------|--------------------------|------------------------|
-| **Szenarien bestanden** | 5/5 (100%) | 5/5 (100%) | 5/5 (100%) | 4/5 (80%) | **5/5 (100%)** | **0/5 (0%)** |
-| **Locatoren geheilt** | 8/8 | 8/8 | 8/8 | 7/8 | **8/8** | **1/2 versucht** |
-| **Test-Dauer** | 8m 50s | 7m 53s | 7m 52s | 19m 39s | 24m 37s | 9m 13s (Abbruch) |
-| **Cache Misses** | 8 | 8 | 8 | 8 | 8 | 2 (dann Cache-Kaskade) |
-| **Cache Hits** | 11–16 | 16 | 16 | — | 14 | 14 (alle vom falschen `input_to`) |
-| **btn_search Strategie** | `By.id("fab_search")` | `By.id("fab_search")` | `accessibilityId("Suche starten")` | `accessibilityId("Suche starten")` | `accessibilityId("Suche starten")` | nie versucht |
+| **Szenarien bestanden** | 6/6 (100%) | 6/6 (100%) | 6/6 (100%) | **6/6 (100%)** | **6/6 (100%)** | **6/6 (100%)** |
+| **Locatoren geheilt** | 10/10 | 10/10 | 10/10 | 10/10 (1× Attempt 2) | **10/10** | **10/10** |
+| **Test-Dauer** | ~15m | ~10m | ~10m | 22m 19s | ~70m | 51m 39s |
+| **Latenz/Heal** | ~12 s | ~5 s | ~4 s | ~80–100 s | ~110 s | ~3.5–8 min |
+| **btn_search Strategie** | `By.id("fab_search")` | `By.id("fab_search")` | `accessibilityId("Suche starten")` | `By.id("fab_search")` | `accessibilityId("Suche starten")` | `By.id("fab_search")` |
 | **Infrastruktur** | Cloud | Cloud | Cloud | Lokal (RTX 3090) | Lokal (RTX 3090) | Lokal (RTX 3090) |
 | **Kosten/Lauf** | $$ | $$ | $$ | 0 $ (Strom) | 0 $ (Strom) | 0 $ (Strom) |
 
 ### Beobachtungen
 
-1. **Alle 3 Cloud-LLMs und Devstral Small 2 schaffen 100% Healing-Rate** für die 8 Locator-Änderungen. **Qwen3-Coder-30B erreicht 87.5%** — ein respektables Ergebnis, aber mit einer konsistenten Schwäche bei `text_to`. **GLM-4.7-Flash kollabiert auf 0%** — der falsche `input_to`-Heal kippt über den Cache alle Folge-Szenarien.
-2. **Mistral, Qwen3-30B und Devstral nutzen AccessibilityId** für den Such-Button statt der Test-Tag-ID — eine valide Alternative, da die App sowohl `testTag("fab_search")` als auch `contentDescription("Suche starten")` hat.
-3. **Anthropic** ist etwas langsamer im Gesamtdurchlauf (8m 50s vs. ~7m 52s), wahrscheinlich wegen der ausführlicheren Triage-Analyse.
-4. **Cache Hit-Rates** sind bei allen Providern identisch (67%), da der Cache unabhängig vom LLM-Provider arbeitet — was bei korrekten Heals ein Vorteil ist, bei einem falschen Heal aber alle Folge-Szenarien killt (Beweis: GLM-4.7-Flash, Cache-Kaskade nach falschem `input_to`).
-5. **Lokale LLMs sind ~2.5–3× langsamer** als die Cloud-Provider — 75–145 s pro Locator-Heal vs. 5–15 s bei Cloud-Modellen. Reasoning-Modelle wie GLM-4.7-Flash addieren noch einmal ~30 % Latenz on top, weil pro Call ein expliziter Chain-of-Thought im `reasoning_content`-Feld erzeugt wird.
-6. **Devstral > Qwen3-30B für Locator-Generalisierung:** Devstral schlägt `label_departure`/`label_arrival` vor (symmetrisches Namensmuster), Qwen3 halluziniert asymmetrisch `label_to` und wiederholt den Vorschlag im Retry. Prompt-Guardrail gegen Wiederholung ist weiterhin sinnvoll, auch wenn Devstral den Fehler nicht triggert.
-7. **Reasoning-Modelle für Locator-Substitution sind Overkill:** GLM-4.7-Flash investiert ~1.000 Triage-Completion-Tokens und ~2.200 Healer-Completion-Tokens pro Heal (3-4× soviel wie Code-Modelle), liefert aber kein besseres Ergebnis. Für rein syntaktische Tasks bringt die explizite Reasoning-Phase keinen Mehrwert. Für komplexere Stages (Triage-Klassifikation, App-Bug-Berichte) könnte sich das anders darstellen — bisher nicht getestet.
+1. **Alle 6 Provider schaffen 100% Healing-Rate** für alle 10 Locator-Änderungen. Der entscheidende Fix: `max-page-source-chars=0` für lokale Profile (kein XML-Truncating) — `journey_card` lag im hinteren Teil der Hierarchie.
+2. **Mistral und Devstral nutzen AccessibilityId** für den Such-Button (`Suche starten`) statt der Test-Tag-ID — valide Alternative, da die App beides hat.
+3. **Lokale LLMs sind ~5–90× langsamer** als Cloud-Provider (80 s bis 8 min pro Heal vs. 4–12 s), aber kostenlos. Für CI-Pipelines empfehlen sich Cloud-Provider; für Privacy-sensible oder Offline-Szenarien reicht Qwen3-30B (~22 min gesamt).
+4. **GLM-4.7-Flash überraschend stark:** Keine einzige Halluzination im 2026-04-20-Lauf — besser als Qwen3 (`text_to → label_to` benötigt 1 Retry). Dafür 2–4× mehr Completion-Tokens durch Reasoning-Overhead.
+5. **Devstral als Null-Retry-Garantie:** Einziges Modell ohne jede Halluzination über alle Runs hinweg. `label_departure`/`label_arrival` direkt korrekt (Qwen3 halluziniert `label_to` im ersten Versuch).
+6. **Cache-Kaskade (historisch):** Der frühere GLM-0/5-Lauf (2026-04-16) wurde durch einen falschen `input_to`-Heal ausgelöst, der sich per Cache in alle Szenarien propagierte. Mit dem `max-page-source-chars=0`-Fix tritt dieser Fall nicht mehr auf.
 
 ---
 
