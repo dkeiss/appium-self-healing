@@ -11,7 +11,7 @@ import java.util.List;
 @RequiredArgsConstructor
 @RestController
 @RequestMapping("/api/v1/connections")
-@CrossOrigin
+@CrossOrigin(origins = {"http://localhost:8080", "http://10.0.2.2:8080"})
 public class ConnectionController {
 
     private final ConnectionService connectionService;

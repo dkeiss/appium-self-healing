@@ -27,19 +27,15 @@ public class SourceCodeResolver {
             String className = element.getClassName();
 
             // Detect Page Object classes
-            if (className.endsWith("Page") || className.contains(".pages.")) {
-                if (pageObjectSource == null) {
-                    pageObjectSource = readSourceFile(className);
-                    pageObjectClassName = className.substring(className.lastIndexOf('.') + 1);
-                }
+            if ((className.endsWith("Page") || className.contains(".pages.")) && pageObjectSource == null) {
+                pageObjectSource = readSourceFile(className);
+                pageObjectClassName = className.substring(className.lastIndexOf('.') + 1);
             }
 
             // Detect Step Definition classes
-            if (className.endsWith("Steps") || className.contains(".steps.")) {
-                if (stepDefinitionSource == null) {
-                    stepDefinitionSource = readSourceFile(className);
-                    stepName = element.getMethodName();
-                }
+            if ((className.endsWith("Steps") || className.contains(".steps.")) && stepDefinitionSource == null) {
+                stepDefinitionSource = readSourceFile(className);
+                stepName = element.getMethodName();
             }
         }
 

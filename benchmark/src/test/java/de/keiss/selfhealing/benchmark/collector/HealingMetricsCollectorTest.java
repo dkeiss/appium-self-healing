@@ -34,8 +34,8 @@ class HealingMetricsCollectorTest {
         // --- Assert: file exists and shape is correct ---
         assertThat(fragmentPath).as("flush must return the written file path").isNotNull().exists();
 
-        assertThat(fragmentPath.getFileName().toString()).as("filename should encode provider and slugified track name")
-                .isEqualTo("anthropic-einfache-locator-nderungen.json");
+        assertThat(fragmentPath.getFileName()).as("filename should encode provider and slugified track name")
+                .hasToString("anthropic-einfache-locator-nderungen.json");
 
         var mapper = new ObjectMapper();
         JsonNode root = mapper.readTree(fragmentPath.toFile());
@@ -47,7 +47,7 @@ class HealingMetricsCollectorTest {
         JsonNode metrics = root.get("healingMetrics");
         assertThat(metrics.isArray()).isTrue();
         assertThat(metrics).hasSize(3);
-        assertThat(metrics.get(0).get("originalLocator").asText()).contains("input_from");
+        assertThat(metrics.get(0).get("originalLocator").stringValue()).contains("input_from");
 
         JsonNode summary = root.get("summary");
         assertThat(summary.get("totalHealingAttempts").asInt()).isEqualTo(3);
@@ -84,10 +84,7 @@ class HealingMetricsCollectorTest {
                 .containsExactly("By.id: a", "By.id: c");
     }
 
-    // --- Helpers ------------------------------------------------------------
-    // Note: we stay off {@code org.openqa.selenium.By} here because the benchmark
-    // module does not transitively depend on Selenium — {@code HealingResult.healedLocator}
-    // is passed as {@code null} and the string form uses raw literal representations.
+    // --- Helpers: no Selenium dependency in benchmark — healedLocator is null, string form is literal ---
 
     private static HealingEvent successEvent(String original, String healed, long durationMs, int tokens) {
         var result = new HealingResult(true, null, "By.id(\"" + healed + "\")", null,

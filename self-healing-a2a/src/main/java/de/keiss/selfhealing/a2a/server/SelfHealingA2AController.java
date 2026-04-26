@@ -12,7 +12,7 @@ import de.keiss.selfhealing.core.model.TriageResult;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.MediaType;
-import org.springframework.lang.Nullable;
+import jakarta.annotation.Nullable;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -20,13 +20,13 @@ import java.util.Map;
 import java.util.UUID;
 
 /**
- * A2A server exposing all four self-healing skills on a single JSON-RPC endpoint.
- * Skill is selected via {@code message.metadata["skill"]}:
+ * A2A server exposing all four self-healing skills on a single JSON-RPC endpoint. Skill is selected via
+ * {@code message.metadata["skill"]}:
  * <ul>
- *   <li>{@code heal-locator}  — ChatClientLocatorHealer</li>
- *   <li>{@code triage-failure} — ChatClientTriageAgent</li>
- *   <li>{@code heal-step}     — ChatClientStepHealer</li>
- *   <li>{@code enrich-context} — ChatClientMcpContextEnricher (optional, may be absent)</li>
+ * <li>{@code heal-locator} — ChatClientLocatorHealer</li>
+ * <li>{@code triage-failure} — ChatClientTriageAgent</li>
+ * <li>{@code heal-step} — ChatClientStepHealer</li>
+ * <li>{@code enrich-context} — ChatClientMcpContextEnricher (optional, may be absent)</li>
  * </ul>
  */
 @Slf4j
@@ -38,6 +38,7 @@ public class SelfHealingA2AController {
     private static final String SKILL_TRIAGE = "triage-failure";
     private static final String SKILL_HEAL_STEP = "heal-step";
     private static final String SKILL_ENRICH = "enrich-context";
+    private static final String TAG_APPIUM = "appium";
 
     private final ChatClientLocatorHealer locatorHealer;
     private final ChatClientTriageAgent triageAgent;
@@ -70,24 +71,21 @@ public class SelfHealingA2AController {
                         + "Select the skill via message.metadata[\"skill\"].",
                 url, "0.2.0", new AgentCard.Capabilities(false, false, false),
                 List.of(MediaType.APPLICATION_JSON_VALUE), List.of(MediaType.APPLICATION_JSON_VALUE),
-                List.of(
-                        new AgentCard.Skill(SKILL_HEAL_LOCATOR, "Heal locator",
-                                "Given a FailureContext, return a HealingResult with a proposed replacement locator",
-                                List.of("appium", "locator", "self-healing"), List.of(), null, null),
+                List.of(new AgentCard.Skill(SKILL_HEAL_LOCATOR, "Heal locator",
+                        "Given a FailureContext, return a HealingResult with a proposed replacement locator",
+                        List.of(TAG_APPIUM, "locator", "self-healing"), List.of(), null, null),
                         new AgentCard.Skill(SKILL_TRIAGE, "Triage failure",
                                 "Classify the root cause of a test failure into LOCATOR_CHANGED, TEST_LOGIC_ERROR, ENVIRONMENT_ISSUE, or APP_BUG",
-                                List.of("appium", "triage"), List.of(), null, null),
+                                List.of(TAG_APPIUM, "triage"), List.of(), null, null),
                         new AgentCard.Skill(SKILL_HEAL_STEP, "Heal step",
                                 "Suggest code-level fixes for a step definition or page object when test logic needs adjustment",
-                                List.of("appium", "step", "self-healing"), List.of(), null, null),
+                                List.of(TAG_APPIUM, "step", "self-healing"), List.of(), null, null),
                         new AgentCard.Skill(SKILL_ENRICH, "Enrich context",
                                 "Use Appium MCP tools to gather a fresh screenshot, page source, and element hints before healing",
-                                List.of("appium", "mcp", "enrichment"), List.of(), null, null)));
+                                List.of(TAG_APPIUM, "mcp", "enrichment"), List.of(), null, null)));
     }
 
-    @PostMapping(path = "${self-healing.a2a.server.base-path:/a2a}",
-            produces = MediaType.APPLICATION_JSON_VALUE,
-            consumes = MediaType.APPLICATION_JSON_VALUE)
+    @PostMapping(path = "${self-healing.a2a.server.base-path:/a2a}", produces = MediaType.APPLICATION_JSON_VALUE, consumes = MediaType.APPLICATION_JSON_VALUE)
     public JsonRpc.Response jsonRpc(@RequestBody JsonRpc.Request request) {
         String id = request.id() != null ? request.id() : UUID.randomUUID().toString();
         try {
@@ -179,8 +177,8 @@ public class SelfHealingA2AController {
             throw new IllegalArgumentException("Message has no parts");
         }
         for (A2APart part : message.parts()) {
-            if (part instanceof A2APart.DataPart dp) {
-                return objectMapper.convertValue(dp.data(), type);
+            if (part instanceof A2APart.DataPart(var data)) {
+                return objectMapper.convertValue(data, type);
             }
         }
         throw new IllegalArgumentException("Message has no data part carrying " + type.getSimpleName());
@@ -189,8 +187,8 @@ public class SelfHealingA2AController {
     private A2ATask buildTask(A2AMessage message, String artifactName, Object resultDto) {
         String taskId = message.taskId() != null ? message.taskId() : UUID.randomUUID().toString();
         String contextId = message.contextId() != null ? message.contextId() : UUID.randomUUID().toString();
-        Map<String, Object> asMap = objectMapper.convertValue(resultDto,
-                new tools.jackson.core.type.TypeReference<>() {});
+        Map<String, Object> asMap = objectMapper.convertValue(resultDto, new tools.jackson.core.type.TypeReference<>() {
+        });
         A2ATask.Artifact artifact = new A2ATask.Artifact(artifactName, resultDto.getClass().getSimpleName(),
                 List.of(new A2APart.DataPart(asMap)));
         return A2ATask.completed(taskId, contextId, artifact);

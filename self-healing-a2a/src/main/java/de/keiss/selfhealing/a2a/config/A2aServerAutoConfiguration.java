@@ -13,9 +13,8 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
 
 /**
- * Activates the A2A server controller when {@code self-healing.a2a.server.enabled=true}.
- * Kept separate from the client autoconfig so a deployment can act only as server, only as
- * client, or (in the spike) as both in the same JVM.
+ * Activates the A2A server controller when {@code self-healing.a2a.server.enabled=true}. Kept separate from the client
+ * autoconfig so a deployment can act only as server, only as client, or (in the spike) as both in the same JVM.
  */
 @AutoConfiguration
 @ConditionalOnClass(ChatClientLocatorHealer.class)

@@ -1,7 +1,9 @@
 plugins {
     java
+    jacoco
     id("org.springframework.boot") apply false
     id("com.diffplug.spotless") version "7.0.4"
+    id("org.sonarqube") version "6.3.1.5724"
 }
 
 allprojects {
@@ -27,6 +29,7 @@ spotless {
 
 subprojects {
     apply(plugin = "java")
+    apply(plugin = "jacoco")
 
     java {
         toolchain {
@@ -50,6 +53,27 @@ subprojects {
 
     tasks.withType<Test> {
         useJUnitPlatform()
+        finalizedBy(tasks.withType<JacocoReport>())
+    }
+
+    tasks.withType<JacocoReport> {
+        dependsOn(tasks.withType<Test>())
+        reports {
+            xml.required.set(true)
+            html.required.set(false)
+        }
+    }
+}
+
+sonar {
+    properties {
+        property("sonar.projectKey", "appium-self-healing")
+        property("sonar.projectName", "appium-self-healing")
+        property("sonar.host.url", System.getenv("SONAR_HOST_URL") ?: "http://localhost:9000")
+        property("sonar.token", System.getenv("SONAR_TOKEN") ?: "")
+        property("sonar.coverage.jacoco.xmlReportPaths",
+            subprojects.joinToString(",") { "${it.layout.buildDirectory.get().asFile}/reports/jacoco/test/jacocoTestReport.xml" })
+        property("sonar.exclusions", "**/build/**,**/generated/**,android-app/**")
     }
 }
 

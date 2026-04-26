@@ -16,9 +16,9 @@ import org.springframework.context.annotation.Primary;
 import java.time.Duration;
 
 /**
- * Registers A2A proxy beans as {@link Primary} when {@code self-healing.a2a.client.enabled=true}.
- * The core autoconfig declares each bean with {@link ConditionalOnMissingBean}, so the remote
- * proxies fully replace in-process implementations.
+ * Registers A2A proxy beans as {@link Primary} when {@code self-healing.a2a.client.enabled=true}. The core autoconfig
+ * declares each bean with {@link ConditionalOnMissingBean}, so the remote proxies fully replace in-process
+ * implementations.
  */
 @AutoConfiguration
 @ConditionalOnProperty(prefix = "self-healing.a2a.client", name = "enabled", havingValue = "true")
@@ -29,8 +29,8 @@ public class A2aClientAutoConfiguration {
         var clientCfg = properties.a2a().client();
         String url = clientCfg.serverUrl();
         if (url == null || url.isBlank()) {
-            throw new IllegalStateException("self-healing.a2a.client.enabled=true but "
-                    + "self-healing.a2a.client.server-url is not set");
+            throw new IllegalStateException(
+                    "self-healing.a2a.client.enabled=true but " + "self-healing.a2a.client.server-url is not set");
         }
         return new A2AClient(url, objectMapper, Duration.ofMillis(clientCfg.requestTimeoutMs()));
     }

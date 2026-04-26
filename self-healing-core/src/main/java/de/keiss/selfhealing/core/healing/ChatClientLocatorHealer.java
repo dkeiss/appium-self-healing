@@ -138,20 +138,10 @@ public class ChatClientLocatorHealer implements LocatorHealer {
      */
     private void extractAnthropicCacheMetrics(Usage usage) {
         try {
-            // Spring AI DefaultUsage wraps the native usage. Try to get it via getNativeUsage()
-            Object nativeUsage = null;
-            try {
-                var nativeMethod = usage.getClass().getMethod("getNativeUsage");
-                nativeUsage = nativeMethod.invoke(usage);
-            } catch (NoSuchMethodException e) {
-                // Not a DefaultUsage wrapper — try the usage object itself
-                nativeUsage = usage;
-            }
-
+            Object nativeUsage = resolveNativeUsage(usage);
             if (nativeUsage == null)
                 return;
 
-            // Try to call cacheCreationInputTokens() and cacheReadInputTokens() on the native object
             Long cacheCreation = invokeOptionalLong(nativeUsage, "cacheCreationInputTokens");
             Long cacheRead = invokeOptionalLong(nativeUsage, "cacheReadInputTokens");
 
@@ -161,6 +151,21 @@ public class ChatClientLocatorHealer implements LocatorHealer {
             }
         } catch (Exception e) {
             log.debug("Could not extract Anthropic cache metrics: {}", e.getMessage());
+        }
+    }
+
+    /**
+     * Returns the native usage object wrapped by Spring AI, or the usage itself as fallback.
+     */
+    private Object resolveNativeUsage(Usage usage) {
+        try {
+            var nativeMethod = usage.getClass().getMethod("getNativeUsage");
+            return nativeMethod.invoke(usage);
+        } catch (NoSuchMethodException _) {
+            // Not a DefaultUsage wrapper — use the usage object itself
+            return usage;
+        } catch (Exception _) {
+            return null;
         }
     }
 
@@ -177,7 +182,8 @@ public class ChatClientLocatorHealer implements LocatorHealer {
             } else if (result instanceof Long l) {
                 return l;
             }
-        } catch (Exception ignored) {
+        } catch (Exception _) {
+            // reflection failed — method not available; cache metrics not exposed by this provider
         }
         return null;
     }

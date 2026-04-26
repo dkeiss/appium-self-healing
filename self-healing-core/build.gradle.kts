@@ -1,6 +1,9 @@
 val springBootVersion: String by project
 val springAiVersion: String by project
 val appiumVersion: String by project
+val jsoupVersion: String by project
+val jgitVersion: String by project
+val githubApiVersion: String by project
 
 dependencies {
     implementation(platform("org.springframework.boot:spring-boot-dependencies:$springBootVersion"))
@@ -13,11 +16,11 @@ dependencies {
     implementation("org.springframework.ai:spring-ai-starter-mcp-client")
 
     implementation("io.appium:java-client:$appiumVersion")
-    implementation("org.jsoup:jsoup:1.22.1")
+    implementation("org.jsoup:jsoup:$jsoupVersion")
 
     // Auto-Fix PR creation (Phase 5.2)
-    implementation("org.eclipse.jgit:org.eclipse.jgit:7.6.0.202603022253-r")
-    implementation("org.kohsuke:github-api:1.330")
+    implementation("org.eclipse.jgit:org.eclipse.jgit:$jgitVersion")
+    implementation("org.kohsuke:github-api:$githubApiVersion")
 
     testImplementation("org.springframework.boot:spring-boot-starter-test")
     // Gradle 9+ no longer auto-provides the JUnit Platform launcher; declare it explicitly.

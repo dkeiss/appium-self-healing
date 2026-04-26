@@ -112,10 +112,10 @@ public record SelfHealingProperties(boolean enabled, int maxRetries, String llmP
     /**
      * Prompt-construction tuning. The main knob is {@code maxPageSourceChars} — it caps how many characters of the
      * Appium XML page source are included in the heal prompt. The default (15 000) is generous enough for cloud LLMs
-     * with large context windows. Local models loaded with a small {@code n_ctx} (e.g. 4 096) will hit a 400 error
-     * from LM Studio if the total prompt exceeds the context length. Setting this to ≈ 6 000 keeps the healer prompt
-     * well within 4 096 tokens while still exposing all top-level UI elements the LLM needs.
-     * Set to {@code 0} to disable truncation entirely (pass the full page source regardless of size).
+     * with large context windows. Local models loaded with a small {@code n_ctx} (e.g. 4 096) will hit a 400 error from
+     * LM Studio if the total prompt exceeds the context length. Setting this to ≈ 6 000 keeps the healer prompt well
+     * within 4 096 tokens while still exposing all top-level UI elements the LLM needs. Set to {@code 0} to disable
+     * truncation entirely (pass the full page source regardless of size).
      */
     public record Prompt(int maxPageSourceChars) {
 
@@ -151,6 +151,7 @@ public record SelfHealingProperties(boolean enabled, int maxRetries, String llmP
 
         public record Server(boolean enabled, String basePath) {
 
+            @SuppressWarnings("java:S1075") // "/a2a" is a configurable default, not a hardcoded path used for I/O
             public Server {
                 if (basePath == null || basePath.isBlank())
                     basePath = "/a2a";

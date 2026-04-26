@@ -18,6 +18,7 @@ public class AppSteps {
 
     private final TestConfig testConfig;
 
+    @SuppressWarnings("java:S2925") // Thread.sleep is necessary for Appium app lifecycle sync
     @Angenommen("die App ist gestartet")
     public void appIsStarted() {
         log.info("Launching app on device...");
@@ -36,7 +37,7 @@ public class AppSteps {
             androidDriver.activateApp(testConfig.getAppPackage());
             try {
                 Thread.sleep(1000); // Wait for app launch and Compose rendering
-            } catch (InterruptedException e) {
+            } catch (InterruptedException _) {
                 Thread.currentThread().interrupt();
             }
         }
