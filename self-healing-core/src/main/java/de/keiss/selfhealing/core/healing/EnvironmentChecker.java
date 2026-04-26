@@ -66,7 +66,7 @@ public class EnvironmentChecker {
     public void waitBeforeRetry() {
         try {
             Thread.sleep(config.retryBackoffMs());
-        } catch (InterruptedException e) {
+        } catch (InterruptedException _) {
             Thread.currentThread().interrupt();
         }
     }
@@ -80,6 +80,10 @@ public class EnvironmentChecker {
             boolean ok = response.statusCode() >= 200 && response.statusCode() < 500;
             return new ServiceStatus(name, url, ok, response.statusCode(),
                     ok ? "reachable" : "HTTP " + response.statusCode());
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            log.warn("Health check interrupted for {} at {}: {}", name, url, e.getMessage());
+            return new ServiceStatus(name, url, false, 0, "InterruptedException: " + e.getMessage());
         } catch (Exception e) {
             log.warn("Health check failed for {} at {}: {}", name, url, e.getMessage());
             return new ServiceStatus(name, url, false, 0, e.getClass().getSimpleName() + ": " + e.getMessage());

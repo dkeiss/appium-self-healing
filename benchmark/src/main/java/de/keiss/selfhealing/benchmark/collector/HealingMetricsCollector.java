@@ -114,7 +114,9 @@ public class HealingMetricsCollector {
     }
 
     private static String buildFilename(String provider, String trackName) {
-        String safeTrack = trackName.toLowerCase().replaceAll("[^a-z0-9]+", "-").replaceAll("^-+|-+$", "");
+        // Two separate replaceAll calls avoid any regex alternation with anchors (no S5850)
+        String safeTrack = trackName.toLowerCase().replaceAll("[^a-z0-9]+", "-").replaceAll("^-+", "").replaceAll("-+$",
+                "");
         if (safeTrack.isBlank())
             safeTrack = "unknown";
         return provider + "-" + safeTrack + ".json";

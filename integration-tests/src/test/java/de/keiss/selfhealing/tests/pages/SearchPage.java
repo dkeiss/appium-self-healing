@@ -45,7 +45,7 @@ public class SearchPage {
         // which may not be rendered while the soft keyboard is shown
         try {
             ((io.appium.java_client.android.AndroidDriver) driver.getDelegate()).hideKeyboard();
-        } catch (Exception ignored) {
+        } catch (Exception _) {
             // keyboard might not be shown
         }
         driver.findElement(BTN_SEARCH).click();

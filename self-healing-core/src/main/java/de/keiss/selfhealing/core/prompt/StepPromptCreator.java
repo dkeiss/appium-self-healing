@@ -8,6 +8,8 @@ import de.keiss.selfhealing.core.model.FailureContext;
  */
 public class StepPromptCreator {
 
+    private static final String CODE_FENCE_END = "\n```\n\n";
+
     public String createSystemPrompt() {
         return """
                 You are an expert mobile test automation engineer fixing a **Cucumber step definition**
@@ -52,17 +54,17 @@ public class StepPromptCreator {
 
         if (context.stepDefinitionSource() != null) {
             sb.append("## Step Definition Source\n```java\n");
-            sb.append(context.stepDefinitionSource()).append("\n```\n\n");
+            sb.append(context.stepDefinitionSource()).append(CODE_FENCE_END);
         }
 
         if (context.pageObjectSource() != null) {
             sb.append("## Page Object: ").append(context.pageObjectClassName()).append("\n```java\n");
-            sb.append(context.pageObjectSource()).append("\n```\n\n");
+            sb.append(context.pageObjectSource()).append(CODE_FENCE_END);
         }
 
         if (context.pageSourceXml() != null) {
             sb.append("## Current Page Source (Appium XML)\n```xml\n");
-            sb.append(truncate(context.pageSourceXml(), 10000)).append("\n```\n\n");
+            sb.append(truncate(context.pageSourceXml(), 10000)).append(CODE_FENCE_END);
         }
 
         return sb.toString();

@@ -123,6 +123,21 @@ public final class DtoMapper {
         }
 
         @Override
+        public boolean equals(Object o) {
+            if (this == o)
+                return true;
+            if (o instanceof StringBy other) {
+                return java.util.Objects.equals(repr, other.repr);
+            }
+            return false;
+        }
+
+        @Override
+        public int hashCode() {
+            return java.util.Objects.hashCode(repr);
+        }
+
+        @Override
         public String toString() {
             return repr;
         }

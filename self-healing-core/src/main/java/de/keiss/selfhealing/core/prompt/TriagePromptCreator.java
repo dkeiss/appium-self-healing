@@ -8,6 +8,8 @@ import de.keiss.selfhealing.core.model.FailureContext;
  */
 public class TriagePromptCreator {
 
+    private static final String CODE_FENCE_END = "\n```\n\n";
+
     public String createSystemPrompt() {
         return """
                 You are an expert QA automation engineer analyzing a **mobile Appium test failure**.
@@ -77,7 +79,7 @@ public class TriagePromptCreator {
             // Only include a summary for triage — full source goes to the healer
             sb.append("First 2000 chars:\n```xml\n");
             sb.append(context.pageSourceXml(), 0, Math.min(2000, context.pageSourceXml().length()));
-            sb.append("\n```\n\n");
+            sb.append(CODE_FENCE_END);
         } else {
             sb.append("## Page Source Available: NO\n\n");
         }
@@ -88,12 +90,12 @@ public class TriagePromptCreator {
 
         if (context.pageObjectSource() != null) {
             sb.append("## Page Object Source\n```java\n");
-            sb.append(context.pageObjectSource()).append("\n```\n\n");
+            sb.append(context.pageObjectSource()).append(CODE_FENCE_END);
         }
 
         if (context.stepDefinitionSource() != null) {
             sb.append("## Step Definition Source\n```java\n");
-            sb.append(context.stepDefinitionSource()).append("\n```\n\n");
+            sb.append(context.stepDefinitionSource()).append(CODE_FENCE_END);
         }
 
         return sb.toString();

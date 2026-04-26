@@ -3,7 +3,9 @@ package de.keiss.selfhealing.core.model;
 import org.openqa.selenium.By;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
+import java.util.Objects;
 
 /**
  * All context collected when a test step fails — passed to healing agents for analysis.
@@ -52,5 +54,40 @@ public record FailureContext(String exceptionMessage, String pageSourceXml, byte
         updated.add(rejected);
         return new FailureContext(exceptionMessage, pageSourceXml, screenshot, failedLocator, pageObjectSource,
                 pageObjectClassName, stepDefinitionSource, stepName, additionalContext, List.copyOf(updated));
+    }
+
+    @Override
+    @SuppressWarnings("java:S6878") // 10-field record — deconstruction pattern would be unreadable; manual equals is
+                                    // clearer
+    public boolean equals(Object o) {
+        if (this == o)
+            return true;
+        if (!(o instanceof FailureContext other))
+            return false;
+        return Objects.equals(exceptionMessage, other.exceptionMessage)
+                && Objects.equals(pageSourceXml, other.pageSourceXml) && Arrays.equals(screenshot, other.screenshot)
+                && Objects.equals(failedLocator, other.failedLocator)
+                && Objects.equals(pageObjectSource, other.pageObjectSource)
+                && Objects.equals(pageObjectClassName, other.pageObjectClassName)
+                && Objects.equals(stepDefinitionSource, other.stepDefinitionSource)
+                && Objects.equals(stepName, other.stepName)
+                && Objects.equals(additionalContext, other.additionalContext)
+                && Objects.equals(rejectedLocators, other.rejectedLocators);
+    }
+
+    @Override
+    public int hashCode() {
+        int result = Objects.hash(exceptionMessage, pageSourceXml, failedLocator, pageObjectSource, pageObjectClassName,
+                stepDefinitionSource, stepName, additionalContext, rejectedLocators);
+        return 31 * result + Arrays.hashCode(screenshot);
+    }
+
+    @Override
+    public String toString() {
+        return "FailureContext[exceptionMessage=" + exceptionMessage + ", pageSourceXml="
+                + (pageSourceXml == null ? "null" : "<" + pageSourceXml.length() + " chars>") + ", screenshot="
+                + (screenshot == null ? "null" : "byte[" + screenshot.length + "]") + ", failedLocator=" + failedLocator
+                + ", pageObjectClassName=" + pageObjectClassName + ", stepName=" + stepName + ", additionalContext="
+                + additionalContext + ", rejectedLocators=" + rejectedLocators + "]";
     }
 }

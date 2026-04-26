@@ -73,10 +73,10 @@ class A2aRoundTripSmokeTest {
         assertThat(received.pageObjectClassName()).isEqualTo("SearchPage");
         assertThat(received.stepName()).isEqualTo("User taps search");
         assertThat(received.additionalContext()).isEqualTo("mcp-note: resource ids changed");
-        assertThat(received.failedLocator().toString()).as("failed locator survives via StringBy wrapper")
-                .isEqualTo(originalContext.failedLocator().toString());
+        assertThat(received.failedLocator()).as("failed locator survives via StringBy wrapper")
+                .hasToString(originalContext.failedLocator().toString());
         assertThat(received.rejectedLocators()).hasSize(1);
-        assertThat(received.rejectedLocators().get(0).toString()).isEqualTo("By.id: old_rejected");
+        assertThat(received.rejectedLocators().get(0)).hasToString("By.id: old_rejected");
     }
 
     @Configuration

@@ -21,8 +21,8 @@ import java.util.Map;
 import java.util.UUID;
 
 /**
- * Minimal A2A client for all self-healing skills. Sends a JSON-RPC {@code message/send} request with a
- * data part carrying the input DTO and a {@code skill} metadata entry to route the request on the server.
+ * Minimal A2A client for all self-healing skills. Sends a JSON-RPC {@code message/send} request with a data part
+ * carrying the input DTO and a {@code skill} metadata entry to route the request on the server.
  */
 @Slf4j
 public class A2AClient {
@@ -63,7 +63,8 @@ public class A2AClient {
 
     private <T> T sendSkillRequest(Object input, String skill, Class<T> resultType) {
         String rpcId = UUID.randomUUID().toString();
-        Map<String, Object> dataMap = objectMapper.convertValue(input, new TypeReference<>() {});
+        Map<String, Object> dataMap = objectMapper.convertValue(input, new TypeReference<>() {
+        });
         Map<String, Object> metadata = Map.of("skill", skill);
         A2AMessage message = new A2AMessage("user", List.of(new A2APart.DataPart(dataMap)),
                 UUID.randomUUID().toString(), null, null, metadata);
@@ -103,8 +104,8 @@ public class A2AClient {
             throw new IllegalStateException("A2A artifact has no parts");
         }
         for (A2APart part : artifact.parts()) {
-            if (part instanceof A2APart.DataPart dp) {
-                return objectMapper.convertValue(dp.data(), resultType);
+            if (part instanceof A2APart.DataPart(var data)) {
+                return objectMapper.convertValue(data, resultType);
             }
         }
         throw new IllegalStateException("A2A artifact has no data part carrying " + resultType.getSimpleName());

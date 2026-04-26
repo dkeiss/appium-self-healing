@@ -28,50 +28,66 @@ public class ChatClientTriageAgent implements TriageAgent {
         ChatResponse chatResponse = chatClient.prompt().system(promptCreator.createSystemPrompt())
                 .user(promptCreator.createUserPrompt(context)).call().chatResponse();
 
-        // Log token usage including cache metrics
-        if (chatResponse != null && chatResponse.getMetadata() != null) {
-            try {
-                Usage usage = chatResponse.getMetadata().getUsage();
-                if (usage != null) {
-                    log.info("Triage token usage — prompt: {}, completion: {}, total: {}", usage.getPromptTokens(),
-                            usage.getCompletionTokens(), usage.getTotalTokens());
+        logTokenUsage(chatResponse);
 
-                    // Extract Anthropic cache metrics via the native usage object
-                    try {
-                        Object nativeUsage = usage;
-                        try {
-                            var nativeMethod = usage.getClass().getMethod("getNativeUsage");
-                            nativeUsage = nativeMethod.invoke(usage);
-                        } catch (NoSuchMethodException ignored) {
-                        }
-                        if (nativeUsage != null) {
-                            Long cacheCreation = invokeOptionalLong(nativeUsage, "cacheCreationInputTokens");
-                            Long cacheRead = invokeOptionalLong(nativeUsage, "cacheReadInputTokens");
-                            if (cacheCreation != null || cacheRead != null) {
-                                log.info("Triage cache — creation: {}, read: {} tokens",
-                                        cacheCreation != null ? cacheCreation : 0, cacheRead != null ? cacheRead : 0);
-                            }
-                        }
-                    } catch (Exception ignored) {
-                    }
-                }
-            } catch (Exception e) {
-                log.debug("Could not extract triage token usage: {}", e.getMessage());
-            }
-        }
-
-        // Parse entity from response content — extract JSON robustly
-        String content = chatResponse.getResult().getOutput().getText();
-        TriageResult result;
-        try {
-            result = MAPPER.readValue(extractJson(content), TriageResult.class);
-        } catch (Exception e) {
-            log.warn("Failed to parse triage response, defaulting to LOCATOR_CHANGED: {}", e.getMessage());
-            result = new TriageResult(TriageResult.FailureCategory.LOCATOR_CHANGED, content, 0.5);
-        }
-
+        TriageResult result = parseResponse(chatResponse);
         log.info("Triage result: {} (confidence: {})", result.category(), result.confidence());
         return result;
+    }
+
+    private TriageResult parseResponse(ChatResponse chatResponse) {
+        String content = chatResponse.getResult().getOutput().getText();
+        try {
+            return MAPPER.readValue(extractJson(content), TriageResult.class);
+        } catch (Exception e) {
+            log.warn("Failed to parse triage response, defaulting to LOCATOR_CHANGED: {}", e.getMessage());
+            return new TriageResult(TriageResult.FailureCategory.LOCATOR_CHANGED, content, 0.5);
+        }
+    }
+
+    private void logTokenUsage(ChatResponse chatResponse) {
+        if (chatResponse == null || chatResponse.getMetadata() == null) {
+            return;
+        }
+        try {
+            Usage usage = chatResponse.getMetadata().getUsage();
+            if (usage == null) {
+                return;
+            }
+            log.info("Triage token usage — prompt: {}, completion: {}, total: {}", usage.getPromptTokens(),
+                    usage.getCompletionTokens(), usage.getTotalTokens());
+            logCacheMetrics(usage);
+        } catch (Exception e) {
+            log.debug("Could not extract triage token usage: {}", e.getMessage());
+        }
+    }
+
+    private void logCacheMetrics(Usage usage) {
+        try {
+            Object nativeUsage = resolveNativeUsage(usage);
+            if (nativeUsage == null) {
+                return;
+            }
+            Long cacheCreation = invokeOptionalLong(nativeUsage, "cacheCreationInputTokens");
+            Long cacheRead = invokeOptionalLong(nativeUsage, "cacheReadInputTokens");
+            if (cacheCreation != null || cacheRead != null) {
+                log.info("Triage cache — creation: {}, read: {} tokens", cacheCreation != null ? cacheCreation : 0,
+                        cacheRead != null ? cacheRead : 0);
+            }
+        } catch (Exception _) {
+            // Native usage is provider-specific; absence is normal for non-Anthropic models
+        }
+    }
+
+    private Object resolveNativeUsage(Usage usage) {
+        try {
+            var nativeMethod = usage.getClass().getMethod("getNativeUsage");
+            return nativeMethod.invoke(usage);
+        } catch (NoSuchMethodException _) {
+            return usage;
+        } catch (Exception _) {
+            return null;
+        }
     }
 
     private String extractJson(String raw) {
@@ -103,7 +119,8 @@ public class ChatClientTriageAgent implements TriageAgent {
             } else if (result instanceof Long l) {
                 return l;
             }
-        } catch (Exception ignored) {
+        } catch (Exception _) {
+            // reflection failed — method not available on this object
         }
         return null;
     }

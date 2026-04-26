@@ -9,6 +9,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.openqa.selenium.*;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 
@@ -27,6 +28,27 @@ public class SelfHealingAppiumDriver {
      * Screenshot taken immediately after a successful healing with the red highlight border visible.
      */
     public record HealingScreenshot(String description, byte[] data) {
+
+        @Override
+        public boolean equals(Object o) {
+            if (this == o)
+                return true;
+            if (o instanceof HealingScreenshot(var desc, var dat)) {
+                return java.util.Objects.equals(description, desc) && Arrays.equals(data, dat);
+            }
+            return false;
+        }
+
+        @Override
+        public int hashCode() {
+            return 31 * java.util.Objects.hashCode(description) + Arrays.hashCode(data);
+        }
+
+        @Override
+        public String toString() {
+            return "HealingScreenshot[description=" + description + ", data="
+                    + (data == null ? "null" : "byte[" + data.length + "]") + "]";
+        }
     }
 
     @Getter
@@ -67,7 +89,7 @@ public class SelfHealingAppiumDriver {
                 WebElement healed = attemptHealAndRetry(locator,
                         new NoSuchElementException("No elements found: " + locator));
                 return List.of(healed);
-            } catch (NoSuchElementException e) {
+            } catch (NoSuchElementException _) {
                 return List.of();
             }
         }
@@ -82,7 +104,7 @@ public class SelfHealingAppiumDriver {
             var wait = new org.openqa.selenium.support.ui.WebDriverWait(delegate,
                     java.time.Duration.ofSeconds(timeoutSeconds));
             return wait.until(d -> d.findElement(locator));
-        } catch (TimeoutException | NoSuchElementException e) {
+        } catch (TimeoutException | NoSuchElementException _) {
             log.warn("Element not found after {}s wait: {} — attempting self-healing", timeoutSeconds, locator);
             return attemptHealAndRetry(locator,
                     new NoSuchElementException("Timed out waiting for element: " + locator));
@@ -106,9 +128,9 @@ public class SelfHealingAppiumDriver {
                     captureHealingScreenshot(failedLocator, result.healedLocator());
                     return element;
                 } catch (NoSuchElementException | InvalidSelectorException retryFail) {
-                    // NoSuchElementException  — healed locator exists in syntax but element not on screen
+                    // NoSuchElementException — healed locator exists in syntax but element not on screen
                     // InvalidSelectorException — healed locator is syntactically invalid (e.g. LLM invented a
-                    //   non-existent UIAutomator method like `contentDescriptionStartsWith`).
+                    // non-existent UIAutomator method like `contentDescriptionStartsWith`).
                     // In both cases the suggestion is unusable: add it to rejectedLocators so the next LLM
                     // call doesn't repeat it, and bypass the cache (handled in HealingOrchestrator).
                     log.warn("Healed locator also failed: {} — {} — retrying...", result.healedLocator(),
@@ -152,10 +174,13 @@ public class SelfHealingAppiumDriver {
     private void captureHealingScreenshot(By originalLocator, By healedLocator) {
         try {
             Thread.sleep(500); // Wait for Compose highlight animation (300ms tween + buffer)
-            byte[] screenshot = ((TakesScreenshot) delegate).getScreenshotAs(OutputType.BYTES);
+            byte[] screenshot = delegate.getScreenshotAs(OutputType.BYTES);
             String desc = "Self-Healing: " + originalLocator + " → " + healedLocator;
             healingScreenshots.add(new HealingScreenshot(desc, screenshot));
             log.debug("Healing screenshot captured: {}", desc);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            log.debug("Interrupted while capturing healing screenshot: {}", e.getMessage());
         } catch (Exception e) {
             log.debug("Could not capture healing screenshot: {}", e.getMessage());
         }
@@ -189,9 +214,10 @@ public class SelfHealingAppiumDriver {
         }
     }
 
+    @SuppressWarnings("java:S1168") // returning null is intentional — callers (buildContext) check for null
     private byte[] safeGetScreenshot() {
         try {
-            return ((TakesScreenshot) delegate).getScreenshotAs(OutputType.BYTES);
+            return delegate.getScreenshotAs(OutputType.BYTES);
         } catch (Exception e) {
             log.warn("Could not take screenshot: {}", e.getMessage());
             return null;

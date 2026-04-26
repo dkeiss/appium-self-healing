@@ -48,13 +48,13 @@ public record BenchmarkReport(Instant generatedAt, List<BenchmarkRun> runs,
         sb.append("\n╔══════════════════════════════════════════════════════════════════════╗\n");
         sb.append("║               LLM SELF-HEALING BENCHMARK REPORT                     ║\n");
         sb.append("╠══════════════════════════════════════════════════════════════════════╣\n");
-        sb.append(String.format("║ %-15s │ %8s │ %8s │ %8s │ %10s ║\n", "Provider", "Success%", "Avg ms", "Tokens",
+        sb.append(String.format("║ %-15s │ %8s │ %8s │ %8s │ %10s ║%n", "Provider", "Success%", "Avg ms", "Tokens",
                 "Est. Cost"));
         sb.append("║─────────────────┼──────────┼──────────┼──────────┼────────────║\n");
 
         providerSummaries.values().stream()
                 .sorted((a, b) -> Double.compare(b.overallSuccessRate(), a.overallSuccessRate()))
-                .forEach(s -> sb.append(String.format("║ %-15s │ %7.1f%% │ %6dms │ %8d │ $%8.4f ║\n", s.provider(),
+                .forEach(s -> sb.append(String.format("║ %-15s │ %7.1f%% │ %6dms │ %8d │ $%8.4f ║%n", s.provider(),
                         s.overallSuccessRate() * 100, s.avgHealingTimeMs(), s.totalTokens(), s.estimatedCostUsd())));
 
         sb.append("╠══════════════════════════════════════════════════════════════════════╣\n");
@@ -64,7 +64,7 @@ public record BenchmarkReport(Instant generatedAt, List<BenchmarkRun> runs,
             sb.append(String.format("║   %-12s: ", provider));
             summary.successRateByDifficulty()
                     .forEach((diff, rate) -> sb.append(String.format("%s=%.0f%% ", diff, rate * 100)));
-            sb.append(String.format("%" + (50 - provider.length()) + "s║\n", ""));
+            sb.append(" ".repeat(Math.max(0, 50 - provider.length()))).append("║\n");
         });
 
         sb.append("╚══════════════════════════════════════════════════════════════════════╝\n");
