@@ -195,3 +195,4 @@ __pycache__/
 *$py.class
 venv/
 .venv/
+.claude-run-all-providers.sh
