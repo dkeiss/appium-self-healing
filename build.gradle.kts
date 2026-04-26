@@ -2,8 +2,8 @@ plugins {
     java
     jacoco
     id("org.springframework.boot") apply false
-    id("com.diffplug.spotless") version "7.0.4"
-    id("org.sonarqube") version "6.3.1.5724"
+    id("com.diffplug.spotless") version "8.4.0"
+    id("org.sonarqube") version "7.2.3.7755"
 }
 
 allprojects {
