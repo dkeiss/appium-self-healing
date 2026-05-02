@@ -1,10 +1,10 @@
-# MCP vs. No-MCP Self-Healing Benchmark Report
+# MCP- vs. No-MCP Self-Healing Benchmark-Bericht
 
-**Date:** 2026-04-17 (Run 2 — with fixes)
+**Datum:** 2026-04-17 (Run 2 — mit Fixes)
 **Track:** `@very-hard-navigation` (Fahrplan-Details hinter BottomSheet-Navigation)
-**App version:** v2 (gegenüber v1 haben sich alle Locatoren geändert)
-**Runs per LLM:** 1 × without MCP, 1 × with MCP
-**Cache:** disabled (`SELF_HEALING_CACHE_ENABLED=false`)
+**App-Version:** v2 (gegenüber v1 haben sich alle Locatoren geändert)
+**Läufe pro LLM:** 1 × ohne MCP, 1 × mit MCP
+**Cache:** deaktiviert (`SELF_HEALING_CACHE_ENABLED=false`)
 
 ### Fixes in diesem Run (gegenüber Run 1 vom 2026-04-17)
 
@@ -80,64 +80,22 @@
 
 ---
 
-## 4. Inhaltliche Bewertung: Bringt MCP einen Mehrwert?
+## 4. Bewertung, Bugs und Empfehlung
 
-### Technisch: Jetzt stabil. Praktisch: Begrenzt.
-
-Die fundamentale Einschränkung bleibt: **`appium-mcp` kann die laufende Testsession nicht nutzen.**
-
-Der Self-Healing-Prozess findet innerhalb der bestehenden `AppiumDriver`-Session statt. Das LLM erhält bereits:
-- das vollständige Page-Source-XML (direkt aus der laufenden Session)
-- den Locator-Fehler
-- den Page-Object-Quellcode
-
-`appium-mcp` als externer Prozess müsste eine **neue** Session am selben Gerät öffnen, was entweder scheitert (Session-Exklusivität) oder die laufende Session unterbricht.
-
-Die Fixes haben die Crashes beseitigt, aber den Kernmangel nicht behoben: MCP-Enrichment liefert keine echten UI-Daten.
-
----
-
-## 5. Bekannte Bugs / gelöste Probleme
+**Kernergebnis:** Technisch stabil, praktisch ohne Mehrwert. `appium-mcp` als externer Prozess kann die laufende `AppiumDriver`-Session nicht nutzen — er müsste eine neue Session am Gerät öffnen, was an der Session-Exklusivität scheitert. Das LLM erhält ohnehin bereits Page-Source-XML, Locator-Fehler und Page-Object-Code aus dem `FailureContext`; MCP-Tool-Calls liefern nur "No driver found"-Texte. Overhead: +9–13 min Laufzeit pro Run, kein messbarer Qualitätsvorteil.
 
 | # | Problem | Status | Lösung |
 |---|---|---|---|
-| 1 | `NonTransientAiException` nach MCP-Enrichment | ✅ **Behoben** | `spring.ai.retry.on-http-codes: [429]` |
-| 2 | `No ToolCallback found: appium_find_elements` | ✅ **Behoben** | Prompt auf exakte Tool-Namen eingeschränkt |
-| 3 | MCP-Enrichment hängt am "No driver found"-Loop | ⚠️ **Offen** | Architekturproblem: Session-Sharing nötig |
-| 4 | Mistral wiederholt dieselbe halluzinierte ID bei Retries | ✅ **Behoben** | `rejectedLocators` in `FailureContext` — Attempt 2 sieht verbotene Vorschläge |
+| 1 | `NonTransientAiException` nach MCP-Enrichment | ✅ Behoben | `spring.ai.retry.on-http-codes: [429]` |
+| 2 | `No ToolCallback found: appium_find_elements` | ✅ Behoben | Prompt auf exakte Tool-Namen eingeschränkt |
+| 3 | MCP-Enrichment hängt am "No driver found"-Loop | ⚠️ Offen | Architekturproblem: Session-Sharing erforderlich |
+| 4 | Mistral wiederholt halluzinierte ID bei Retries | ✅ Behoben | `rejectedLocators` in `FailureContext` |
+
+**Empfehlung:** `self-healing.mcp.enabled` bleibt `false` (Standardwert). Falls MCP weiterentwickelt werden soll, müsste `appium-mcp` die Session-ID der laufenden Test-Session übergeben bekommen (`--session-id`), statt eine neue zu öffnen. Der MCP-Profil-Support im Stack bleibt für künftige Experimente erhalten.
 
 ---
 
-## 6. Fazit & Empfehlung
-
-| Frage | Antwort |
-|---|---|
-| Bringt MCP-Enrichment Healing-Qualität? | **Marginal** — Mistral/MCP löst 1 Locator besser (Zufall nicht ausschließbar) |
-| Verbessert MCP die Success-Rate? | **Nicht verlässlich** — Anthropic/OpenAI: gleich (6/6), Mistral: evtl. +1 |
-| Ist MCP-Integration stabil? | **Ja** — nach den beiden Fixes keine Crashes mehr |
-| Lohnt sich der Overhead? | **Nein** — OpenAI: +13 min/Run, Anthropic: +9 min/Run; kein messbarer Qualitätsvorteil |
-| Soll MCP im Standard-Profil aktiviert werden? | **Nein** |
-
-### Empfohlene nächste Schritte (falls MCP dennoch weiterentwickelt werden soll)
-
-1. **Session-Sharing statt eigener Session**: `appium-mcp` muss die Session-ID der laufenden `AppiumDriver`-Session übergeben bekommen (`--session-id`), anstatt eine neue Session zu öffnen. Nur so kann es tatsächlich mit der live laufenden App interagieren.
-2. **Bis dahin**: `self-healing.mcp.enabled` bleibt `false` (Standardwert). Der MCP-Profil-Support im Stack bleibt erhalten für künftige Experimente.
-
----
-
-## 7. Baseline-Vergleich (ohne MCP, ohne rejected-locators-Fix)
-
-| Provider | Success-Rate | ∅ Heal-Zeit | Kosten/Run |
-|---|---|---|---|
-| Anthropic claude-sonnet-4-6 | **100 %** (6/6) | 12 085 ms | ~$1.50 |
-| OpenAI gpt-4.1 | **100 %** (6/6) |  5 265 ms | ~$0.82 |
-| Mistral codestral-latest | **83 %** (5/6) |  3 775 ms | ~$0.12 |
-
-Beim `@very-hard-navigation`-Szenario scheitert Mistral/Codestral konsistent an dem Locator `leg_platform` — der BottomSheet-Kontext scheint das Modell zu überfordern. Anthropic und OpenAI lösen alle Szenarien zuverlässig.
-
----
-
-## 8. Rejected-Locators Fix — Verification Run (17.04.2026)
+## 5. Rejected-Locators Fix — Verification Run (17.04.2026)
 
 Nach dem Commit `rejectedLocators` wurden alle 3 Provider erneut ohne MCP getestet:
 
@@ -158,7 +116,9 @@ Mistral ist jetzt **100 % (6/6)** — erstmals ohne MCP.
 
 ---
 
-## 9. Devstral Small 2 lokal — @very-hard-navigation (17.04.2026)
+## 6. Devstral Small 2 lokal — @very-hard-navigation (17.04.2026)
+
+Devstral Small 2 wurde auf demselben Track als lokales Referenz-Modell gegen die Cloud-Provider getestet:
 
 | Metrik | Wert |
 |---|---|
@@ -169,19 +129,7 @@ Mistral ist jetzt **100 % (6/6)** — erstmals ohne MCP.
 | Gesamtdauer | 70 min 9 s |
 | Kosten | ~$0 (lokale GPU) |
 
-**Geheilte Locatoren (Auswahl):**
-
-| v1-Locator | Geheilt zu | Attempt |
-|---|---|---|
-| `leg_platform` | `AppiumBy.accessibilityId: Gleis 9` | **1** |
-| `leg_train_number` | `AppiumBy.accessibilityId: Zug ICE ICE 123` | **1** |
-| `input_from` / `input_to` | `departure_station` / `arrival_station` | **1** |
-| `text_from` / `text_to` | `label_departure` / `label_arrival` | **1** |
-| `btn_search` | `AppiumBy.accessibilityId: Suche starten` | **1** |
-
-Kein einziger Retry, keine Halluzination. Devstral heilt `leg_platform` direkt korrekt — Cloud-Mistral (Codestral) braucht dafür den `rejectedLocators`-Fix und zwei Attempts.
-
-**Einordnung gegenüber Cloud-Providern:**
+Devstral heilt `leg_platform` direkt korrekt als `accessibilityId: Gleis 9` — Cloud-Mistral braucht dafür den `rejectedLocators`-Fix und zwei Attempts. Detaillierte Locator-Liste sowie Vergleich gegen Qwen3-Coder-30B und GLM-4.7-Flash siehe [TEST-RESULTS.md](../TEST-RESULTS.md#lokale-llms-im-detail).
 
 | Provider | Tests | ∅ Heal-Zeit | Kosten/Run | Heals Attempt 1 |
 |---|---|---|---|---|
@@ -189,16 +137,3 @@ Kein einziger Retry, keine Halluzination. Devstral heilt `leg_platform` direkt k
 | OpenAI gpt-4.1 | 6/6 ✅ | 5 618 ms | ~$0.82 | 31/31 |
 | Mistral codestral-latest | 6/6 ✅ | 3 780 ms | ~$0.12 | 30/31 |
 | **Devstral Small 2 (lokal)** | **6/6 ✅** | **100 344 ms** | **~$0** | **31/31** |
-
----
-
-## 10. Vergleich Run 1 vs. Run 2
-
-| Provider + MCP | Run 1 | Run 2 | Δ |
-|---|---|---|---|
-| Anthropic ✗ | 6/6 ✅ · 12 465 ms · 313 268 T | 6/6 ✅ · 12 085 ms · 313 133 T | stabil |
-| Anthropic ✓ | 6/6 ✅ · 14 718 ms · 331 902 T | 6/6 ✅ · 15 656 ms · 332 491 T | stabil |
-| OpenAI ✗ | 6/6 ✅ ·  5 756 ms · 254 361 T | 6/6 ✅ ·  5 265 ms · 254 565 T | stabil |
-| OpenAI ✓ | 0/6 ❌ (abgebrochen) | 6/6 ✅ · 20 400 ms · 256 917 T | **Fix 1 wirksam** |
-| Mistral ✗ | 5/6 ❌ · 3 660 ms · 301 362 T | 5/6 ❌ ·  3 775 ms · 301 450 T | stabil (selber Locator scheitert) |
-| Mistral ✓ | 5/6 ❌ (tool-dispatch-Fehler) | 6/6 ✅ ·  4 079 ms · 287 653 T | **Fix 2 wirksam** |

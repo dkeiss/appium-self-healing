@@ -1,13 +1,13 @@
 #!/bin/bash
 # ─── Appium Self-Healing Test Runner ────────────────────────────────
 # Usage:
-#   ./run-tests.sh                     # Run v1 tests with Claude (should pass)
-#   ./run-tests.sh v2                  # Run v1 tests against v2 app (triggers self-healing)
-#   ./run-tests.sh v2 openai           # Self-healing with GPT
-#   ./run-tests.sh benchmark           # Compare all LLMs
+#   ./scripts/run-tests.sh                # Run v1 tests with Claude (should pass)
+#   ./scripts/run-tests.sh v2             # Run v1 tests against v2 app (triggers self-healing)
+#   ./scripts/run-tests.sh v2 openai      # Self-healing with GPT
+#   ./scripts/run-tests.sh benchmark      # Compare all LLMs
 # ────────────────────────────────────────────────────────────────────
 
-cd "$(dirname "$0")"
+cd "$(dirname "$0")/.."
 
 APP_VERSION="${1:-v1}"
 LLM_PROVIDER="${2:-anthropic}"
@@ -21,7 +21,10 @@ fi
 # Build APKs if needed
 if [ ! -f "android-app/app/build/outputs/apk/v1/debug/app-v1-debug.apk" ]; then
     echo "Building Android APKs..."
-    cd android-app && ./gradlew assembleV1Debug assembleV2Debug --no-daemon && cd ..
+    (cd android-app && ./gradlew assembleV1Debug assembleV2Debug --no-daemon) || {
+        echo "ERROR: APK build failed. See above."
+        exit 1
+    }
 fi
 
 echo "╔══════════════════════════════════════════════════╗"

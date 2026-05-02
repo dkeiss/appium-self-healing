@@ -1,42 +1,41 @@
-# Running the Test Stack with Podman on Windows/WSL2
+# Test-Stack mit Podman unter Windows/WSL2 ausführen
 
-This document explains how to run `docker-compose.yml` with Podman on Windows, including all setup steps and common pitfalls encountered during first-time setup.
+Dieses Dokument beschreibt, wie sich `docker-compose.yml` mit Podman unter Windows ausführen lässt — inklusive aller Setup-Schritte und typischer Stolperfallen aus dem ersten Setup.
 
-## Prerequisites
+## Voraussetzungen
 
-- **Windows 11** with WSL2 enabled
-- **Podman Desktop** with a running WSL2 machine (`podman machine list` should show it)
-- **Android SDK** installed locally (needed to build the test APKs)
-- **API keys** for Anthropic, OpenAI, Mistral (put them in `docker/.env`)
+- **Windows 11** mit aktiviertem WSL2
+- **Podman Desktop** mit laufender WSL2-Maschine (`podman machine list` muss sie zeigen)
+- Lokal installiertes **Android SDK** (zum Bauen der Test-APKs)
+- **API-Keys** für Anthropic, OpenAI, Mistral (in `docker/.env` eintragen)
 
-## One-time setup
+## Einmaliges Setup
 
-### 1. Enable KVM in the Podman WSL2 machine
+### 1. KVM in der Podman-WSL2-Maschine aktivieren
 
-The `budtmo/docker-android` emulator needs `/dev/kvm` for hardware acceleration,
-otherwise the app's instrumentation process crashes.
+Der `budtmo/docker-android`-Emulator benötigt `/dev/kvm` für Hardware-Beschleunigung — ohne KVM stürzt der Instrumentations-Prozess der App beim Start ab.
 
-Create or edit `C:\Users\<you>\.wslconfig`:
+`C:\Users\<dein-user>\.wslconfig` anlegen oder ergänzen:
 
 ```ini
 [wsl2]
 nestedVirtualization=true
 ```
 
-Then in **PowerShell as Administrator**:
+Anschließend in **PowerShell als Administrator**:
 
 ```powershell
 wsl --shutdown
 ```
 
-Wait a few seconds, then verify KVM is available in the Podman machine:
+Ein paar Sekunden warten und dann prüfen, dass KVM in der Podman-Maschine verfügbar ist:
 
 ```bash
 podman machine ssh ls /dev/kvm
-# should print: /dev/kvm
+# Ausgabe muss sein: /dev/kvm
 ```
 
-The compose file passes `/dev/kvm` into the emulator container via:
+Die Compose-Datei reicht `/dev/kvm` über folgenden Block in den Emulator-Container weiter:
 
 ```yaml
 android-emulator:
@@ -44,103 +43,97 @@ android-emulator:
     - /dev/kvm
 ```
 
-### 2. Create `.env`
+### 2. `.env` anlegen
 
 ```bash
 cp docker/.env.example docker/.env
 ```
 
-Fill in the API keys for the providers you want to benchmark.
+API-Keys für die zu benchmarkenden Provider eintragen.
 
-### 3. Build the Android APKs
+### 3. Android-APKs bauen
 
-The emulator service mounts `android-app/app/build/outputs/apk` read-only; the
-tests refer to `v1/debug/app-v1-debug.apk` and `v2/debug/app-v2-debug.apk`.
-These must be built **before** running the stack:
+Der Emulator-Service mountet `android-app/app/build/outputs/apk` read-only; die Tests greifen auf `v1/debug/app-v1-debug.apk` und `v2/debug/app-v2-debug.apk` zu. Diese müssen **vor** dem Stack-Start gebaut sein:
 
 ```bash
 cd android-app
 ./gradlew assembleV1Debug assembleV2Debug
 ```
 
-On Windows, make sure `ANDROID_HOME` points to your SDK:
+Unter Windows muss `ANDROID_HOME` auf das SDK zeigen:
+
 ```bash
 export ANDROID_HOME="$LOCALAPPDATA/Android/Sdk"
 ```
 
-If `gradle-wrapper.jar` is missing, download it once:
+Falls `gradle-wrapper.jar` fehlt, einmalig herunterladen:
+
 ```bash
 curl -sL "https://raw.githubusercontent.com/gradle/gradle/v9.4.0/gradle/wrapper/gradle-wrapper.jar" \
      -o android-app/gradle/wrapper/gradle-wrapper.jar
 ```
 
-## Running the stack
+## Stack ausführen
 
-Default test run (uses `LLM_PROVIDER` from `.env`):
+Standard-Testlauf (verwendet `LLM_PROVIDER` aus `.env`):
 
 ```bash
 podman compose -f docker/docker-compose.yml up
 ```
 
-Full benchmark — runs all three providers (Anthropic, OpenAI, Mistral) sequentially:
+Vollständiger Benchmark — führt alle drei Provider (Anthropic, OpenAI, Mistral) sequentiell aus:
 
 ```bash
 podman compose -f docker/docker-compose.yml --profile benchmark up
 ```
 
-Reports land in `build/reports/` (host-mounted). Per-provider logs:
-`build/reports/benchmark-<provider>.log`.
+Reports landen in `build/reports/` (auf den Host gemountet). Provider-spezifische Logs unter `build/reports/benchmark-<provider>.log`.
 
-To stop and clean up:
+Stoppen und aufräumen:
 
 ```bash
 podman compose -f docker/docker-compose.yml down
 ```
 
-## Pitfalls and fixes
+## Stolperfallen und Lösungen
 
 ### 1. `env file docker/.env not found`
 
-The compose file declares `env_file: .env` per-service, which resolves
-**relative to the compose file's directory**, not the `--env-file` flag.
-Make sure `docker/.env` actually exists.
+Die Compose-Datei deklariert `env_file: .env` pro Service — der Pfad wird **relativ zum Verzeichnis der Compose-Datei** aufgelöst, nicht relativ zum `--env-file`-Flag. `docker/.env` muss tatsächlich existieren.
 
-### 2. `./gradlew: not found` inside the build
+### 2. `./gradlew: not found` im Build
 
-Cause: `gradlew` has **CRLF line endings** (Windows default), and the Linux
-shell inside the container can't find the `#!/bin/sh` interpreter.
+Ursache: `gradlew` hat **CRLF-Zeilenenden** (Windows-Default), und die Linux-Shell im Container findet den `#!/bin/sh`-Interpreter nicht.
 
-Fix (already applied in the Dockerfiles):
+Fix (bereits in den Dockerfiles aktiv):
+
 ```dockerfile
 RUN sed -i 's/\r$//' gradlew && chmod +x gradlew
 ```
 
-Long-term fix: `.gitattributes` enforces LF for `gradlew` and `*.sh`.
+Langzeit-Fix: `.gitattributes` erzwingt LF für `gradlew` und `*.sh`.
 
 ### 3. `statfs .../android-app/app/build/outputs/apk: no such file or directory`
 
-The volume mount requires the host directory to exist **before** the container
-starts. Create it (or build the APKs first):
+Das Volume-Mount setzt voraus, dass das Host-Verzeichnis **vor** dem Containerstart existiert. Anlegen (oder die APKs vorher bauen):
 
 ```bash
 mkdir -p android-app/app/build/outputs/apk
 mkdir -p build/reports
 ```
 
-### 4. `The instrumentation process cannot be initialized` / app crashes
+### 4. `The instrumentation process cannot be initialized` / App stürzt ab
 
-Cause: The Android emulator runs without KVM acceleration; the app crashes
-immediately on startup.
+Ursache: Der Android-Emulator läuft ohne KVM-Beschleunigung; die App stürzt direkt beim Start ab.
 
-Fix: Enable KVM as described in step 1 above. Check that the emulator logs
-`KVM activated` on startup.
+Fix: KVM wie in Schritt 1 aktivieren. In den Emulator-Logs muss `KVM activated` beim Start erscheinen.
 
-### 5. Benchmark loop: `sh: -Dcucumber.filter.tags=@self-healing: not found`
+### 5. Benchmark-Schleife: `sh: -Dcucumber.filter.tags=@self-healing: not found`
 
-Cause: YAML `>` folded block scalar breaks shell line continuations (`\`).
-The backslash + newline becomes backslash + space, which is not a line continuation.
+Ursache: YAML-`>`-Folded-Block-Scalar zerstört Shell-Line-Continuations (`\`). Der Backslash + Newline wird zu Backslash + Space — das ist keine Line-Continuation.
 
-Fix (already applied):
+Fix (bereits aktiv):
+
 ```yaml
 entrypoint:
   - sh
@@ -153,36 +146,30 @@ entrypoint:
     done
 ```
 
-Notes:
-- `$$provider` escapes the `$` so Docker Compose passes it as `$provider` to the shell (not as a Compose variable)
-- `|` literal block scalar preserves newlines — no line-continuation needed
-- `--rerun` forces Gradle to skip its test-result cache between providers
+Hinweise:
+- `$$provider` escaped das `$`, sodass Docker-Compose es als `$provider` an die Shell durchreicht (statt als Compose-Variable)
+- `|` (Literal-Block-Scalar) erhält Newlines — keine Line-Continuation nötig
+- `--rerun` zwingt Gradle dazu, den Test-Result-Cache zwischen Providern zu überspringen
 
-### 7. First provider fails: `Could not proxy command ... socket hang up`
+### 6. Erster Provider scheitert: `Could not proxy command ... socket hang up`
 
-Even after the `android-emulator` healthcheck passes (checking
-`boot_completed` and Appium `/status`), the UiAutomator2 server inside the
-emulator often isn't fully ready yet. The first newSession request then fails
-with a socket hang up.
+Auch wenn der `android-emulator`-Healthcheck (prüft `boot_completed` und Appium `/status`) durchläuft, ist der UiAutomator2-Server im Emulator oft noch nicht bereit. Der erste `newSession`-Request scheitert dann mit *socket hang up*.
 
-Fix (already applied in benchmark-runner entrypoint):
-- A `sleep 60` warm-up before the first provider run
-- A 3-attempt retry loop per provider with 20s back-off
+Fix (bereits im benchmark-runner-Entrypoint aktiv):
+- `sleep 60` als Warm-up vor dem ersten Provider-Lauf
+- 3-Versuche-Retry-Loop pro Provider mit 20 s Back-off
 
-This sacrifices ~1 minute but makes the benchmark deterministic on cold starts.
+Kostet ~1 Minute, macht den Benchmark aber bei Cold-Starts deterministisch.
 
-### 6. `RunRoot is pointing to a path (/run/user/1000/containers) which is not writable`
+### 7. `RunRoot is pointing to a path (/run/user/1000/containers) which is not writable`
 
-That warning appears when running `podman` directly inside WSL2 without a
-properly initialized XDG runtime directory. Use `podman.exe` from Windows
-instead, or re-launch WSL2 as a proper interactive session.
+Diese Warnung erscheint, wenn `podman` direkt unter WSL2 ohne korrekt initialisiertes XDG-Runtime-Verzeichnis läuft. Stattdessen `podman.exe` aus Windows verwenden, oder WSL2 als ordentliche interaktive Session neu starten.
 
-## Verifying the emulator
+## Emulator-Verifikation
 
-The emulator exposes a noVNC view — open http://localhost:6080 in a browser
-once the container is healthy. Appium is on http://localhost:4723, ADB on 5555.
+Der Emulator stellt eine noVNC-Ansicht bereit — sobald der Container healthy ist, ist sie unter http://localhost:6080 im Browser erreichbar. Appium läuft auf http://localhost:4723, ADB auf 5555.
 
 ```bash
-# Check emulator health:
+# Emulator-Health prüfen:
 podman inspect docker-android-emulator-1 --format '{{.State.Health.Status}}'
 ```

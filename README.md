@@ -27,33 +27,7 @@ UI-Tests brechen häufig — nicht wegen Bugs in der App, sondern wegen **Änder
 
 ### Die Lösung
 
-Eine **Agent-Pipeline aus 4 LLM-Agenten und 2 regelbasierten Handlern** analysiert jeden Testfehler, klassifiziert die Ursache und repariert den Test automatisch:
-
-```
-     Test schlägt fehl
-            │
-            ▼
-   ┌─────────────────┐
-   │  1. TRIAGE      │  Was ist die Ursache?
-   │     Agent       │  → Locator | Umgebung | Bug | Test-Logik
-   └────────┬────────┘
-            │
-   ┌────────┴─────────────────────┐
-   │                              │
-   ▼                              ▼
-┌──────────┐              ┌──────────────┐
-│ 2. HEAL  │              │ 2. REPORT    │
-│  Locator/│              │  Bug/Umgebung│
-│  Step Fix│              │  (kein Fix)  │
-└─────┬────┘              └──────────────┘
-      │
-      ▼
-┌──────────┐
-│ 3. VERIFY│  Healed Locator → Retry → Erfolg?
-└──────────┘
-```
-
-Das System unterstützt **verschiedene LLMs** (Claude, GPT, Mistral, lokal) und ermöglicht den **direkten Vergleich** ihrer Self-Healing-Fähigkeiten.
+Eine **Agent-Pipeline aus 4 LLM-Agenten und 2 regelbasierten Handlern** analysiert jeden Testfehler, klassifiziert die Ursache (Locator | Umgebung | Bug | Test-Logik) und heilt oder reportet — anschließend wird mit dem geheilten Locator erneut versucht. Detail-Flowchart unter [Healing-Pipeline](#healing-pipeline). Das System unterstützt verschiedene LLMs (Claude, GPT, Mistral, lokal) und ermöglicht den direkten Vergleich ihrer Self-Healing-Fähigkeiten.
 
 ### Ablauf einer Self-Healing-Demo
 
@@ -105,53 +79,9 @@ sequenceDiagram
 
 Die Demo-App zeigt Zugverbindungen zwischen deutschen Bahnhöfen. Zwei UI-Versionen demonstrieren den Self-Healing-Mechanismus:
 
-### v1 vs. v2 Änderungen
+### v1 → v2 Locator-Änderungen
 
-```mermaid
-graph LR
-    subgraph V1["v1: Original Layout"]
-        direction TB
-        V1_S[Such-Screen<br/>Einzelseite]
-        V1_I1["input_from<br/>Von"]
-        V1_I2["input_to<br/>Nach"]
-        V1_B["btn_search<br/>Button"]
-        V1_L["connection_list<br/>LazyColumn"]
-        V1_C["connection_item<br/>Card"]
-        V1_S --> V1_I1
-        V1_S --> V1_I2
-        V1_S --> V1_B
-        V1_S --> V1_L
-        V1_L --> V1_C
-    end
-
-    subgraph V2["v2: Redesigned"]
-        direction TB
-        V2_S[Such-Screen]
-        V2_R[Ergebnis-Screen]
-        V2_I1["departure_station<br/>Abfahrt"]
-        V2_I2["arrival_station<br/>Ankunft"]
-        V2_SW["btn_swap<br/>NEU"]
-        V2_F["fab_search<br/>FAB"]
-        V2_L["results_container<br/>LazyColumn"]
-        V2_C["journey_card<br/>Card mit Row"]
-        V2_D["detail_sheet<br/>NEU: BottomSheet"]
-        V2_S --> V2_I1
-        V2_S --> V2_I2
-        V2_S --> V2_SW
-        V2_S --> V2_F
-        V2_S -->|Navigation| V2_R
-        V2_R --> V2_L
-        V2_L --> V2_C
-        V2_C --> V2_D
-    end
-
-    V1 -.->|UI-Redesign| V2
-
-    style V1 fill:#e8f5e9
-    style V2 fill:#ffebee
-```
-
-### Detaillierte Locator-Änderungen
+v1 ist eine Einzelseiten-App mit Standard-IDs; v2 hat einen separaten Ergebnis-Screen, einen FAB statt Button, neue testTags und ein BottomSheet mit Detailansicht.
 
 | Element | v1 (testTag) | v2 (testTag) | Änderungstyp | Heal-Schwierigkeit |
 |---------|-------------|-------------|---------------|-------------------|
@@ -178,32 +108,7 @@ graph LR
 - Mindestens ein LLM API-Key (oder LM Studio für lokale Ausführung)
 - Optional: Android SDK (nur zum Bauen der APKs)
 
-#### KVM-Aktivierung (Windows / WSL2)
-
-Der Docker-basierte Android-Emulator benötigt **Nested Virtualization (KVM)**. Unter WSL2 muss diese explizit aktiviert werden:
-
-1. Datei `C:\Users\<DEIN_USER>\.wslconfig` erstellen/ergänzen:
-
-   ```ini
-   [wsl2]
-   nestedVirtualization=true
-   ```
-
-2. WSL neu starten:
-
-   ```powershell
-   wsl --shutdown
-   ```
-
-3. Prüfen, ob KVM verfügbar ist:
-
-   ```bash
-   ls -la /dev/kvm
-   ```
-
-   Wenn `/dev/kvm` vorhanden ist, kann der Android-Emulator im Docker-Container starten.
-
-> **Hinweis:** Ohne KVM schlägt der Emulator-Container fehl mit `Could not find a connected Android device`. Die Health-Checks von Docker Compose laufen durch, aber der Emulator bootet kein virtuelles Gerät.
+> **Hinweis (Windows/WSL2):** Der Docker-basierte Android-Emulator benötigt **Nested Virtualization (KVM)**. Setup-Anleitung siehe [docker/PODMAN.md → Schritt 1](docker/PODMAN.md#1-kvm-in-der-podman-wsl2-maschine-aktivieren). Ohne KVM schlägt der Emulator-Start fehl.
 
 ### 1. API-Keys konfigurieren
 
@@ -228,15 +133,18 @@ Erzeugt:
 
 ```bash
 # v1-Tests gegen v1-App (Baseline — alles grün)
-./run-tests.sh v1
+./scripts/run-tests.sh v1
 
 # v1-Tests gegen v2-App (Self-Healing wird ausgelöst!)
-./run-tests.sh v2
+./scripts/run-tests.sh v2
 
 # Mit anderem LLM-Provider
-./run-tests.sh v2 openai
-./run-tests.sh v2 mistral
-./run-tests.sh v2 local
+./scripts/run-tests.sh v2 openai
+./scripts/run-tests.sh v2 mistral
+./scripts/run-tests.sh v2 local
+
+# Auf Podman statt Docker
+./scripts/run-tests-podman.sh v2
 ```
 
 Nach dem Testlauf sind die Ergebnisse unter `build/reports/` verfügbar:
@@ -255,153 +163,23 @@ Jeder Report enthält **Screenshots der App** nach jedem Szenario — so lässt 
 
 Die versionsspezifischen Reports (`cucumber-v1.html`, `cucumber-v2.html`) werden automatisch nach jedem Lauf erzeugt, sodass v1- und v2-Reports sich nicht gegenseitig überschreiben.
 
+#### Highlight-Feature: Rote Markierung geheilter Elemente
+
+Die App nutzt `Modifier.healableTestTag()` (statt `Modifier.testTag()`) — ein Custom-Modifier, der nach erfolgreichem Heal einen **3 dp roten Border** um das geheilte Element zeichnet. Der `SelfHealingAppiumDriver` sendet einen Android-Broadcast (`de.keiss.selfhealing.HIGHLIGHT`), wartet 500 ms auf die Compose-Animation, macht einen Screenshot und hängt ihn ans Cucumber-Szenario an. Nach 3 s (`HIGHLIGHT_DURATION_MS`) wird der Border automatisch entfernt. Dadurch sind die geheilten Elemente sowohl im Cucumber-HTML-Report als auch live im noVNC sichtbar.
+
 > **Tipp:** Während die Tests laufen, kann der Emulator live im Browser unter [http://localhost:6080](http://localhost:6080) (noVNC) beobachtet werden — so lässt sich der Ablauf in der App in Echtzeit verfolgen.
-
-### 4. Was passiert beim Self-Healing-Lauf?
-
-```mermaid
-sequenceDiagram
-    participant U as Benutzer
-    participant DC as Docker Compose
-    participant EM as Android Emulator
-    participant AP as Appium
-    participant BE as Backend
-    participant TR as Test Runner
-    participant LLM as LLM Provider
-
-    U->>DC: ./run-tests.sh v2
-
-    par Infrastruktur starten
-        DC->>EM: Emulator starten (Samsung Galaxy S10)
-        DC->>BE: Backend starten (Port 8080)
-    end
-
-    EM-->>DC: Emulator ready + Appium ready
-
-    DC->>EM: App v2 installieren (app-v2-debug.apk)
-    DC->>TR: Tests starten
-
-    loop Für jedes Cucumber-Szenario
-        TR->>AP: findElement("input_from")
-        AP-->>TR: NoSuchElementException
-
-        Note over TR: Self-Healing Pipeline
-
-        TR->>AP: getPageSource()
-        AP-->>TR: XML mit "departure_station"
-        TR->>LLM: Triage + Heal (XML + PageObject)
-        LLM-->>TR: "departure_station" (accessibilityId)
-        TR->>AP: findElement("departure_station")
-        AP-->>TR: Element gefunden!
-        TR->>TR: Cache: "input_from" → "departure_station"
-    end
-
-    TR-->>DC: Tests abgeschlossen
-    DC-->>U: Reports in build/reports/
-```
 
 ### Manuell starten (ohne Docker)
 
-```bash
-# 1. Backend starten
-./gradlew :backend:bootRun
-
-# 2. Appium separat starten
-appium --relaxed-security
-
-# 3. App auf Emulator/Gerät installieren
-adb install android-app/app/build/outputs/apk/v2/debug/app-v2-debug.apk
-
-# 4. Tests ausführen
-ANTHROPIC_API_KEY=sk-ant-... \
-./gradlew :integration-tests:test \
-    -Dappium.url=http://localhost:4723 \
-    -Dspring.profiles.active=anthropic
-```
+Backend (`./gradlew :backend:bootRun`), Appium (`appium --relaxed-security`) und Emulator separat starten, App via `adb install` installieren, dann Tests via `./gradlew :integration-tests:test -Dappium.url=http://localhost:4723 -Dspring.profiles.active=anthropic` mit gesetztem API-Key ausführen.
 
 ---
 
 ## Architektur
 
-### Gesamtarchitektur
+Das Projekt kombiniert zwei Integrationsmuster — **Decorator** auf Test-Ebene (`SelfHealingAppiumDriver` umwickelt `AppiumDriver`, Tests laufen mit voller Geschwindigkeit), **MCP-Client** auf Agent-Ebene (Spring AI verbindet sich zum offiziellen `appium/appium-mcp`-Server für Screenshots und DOM-Exploration). LLM-Calls erfolgen nur bei Fehlern.
 
-```mermaid
-graph TB
-    subgraph Docker["Docker Compose"]
-        subgraph Emulator["Android Emulator + Appium"]
-            AE[budtmo/docker-android<br/>Samsung Galaxy S10 · Android 14]
-            AS[Appium Server<br/>Port 4723]
-            APP_V1[App v1<br/>Original Layout]
-            APP_V2[App v2<br/>Redesigned]
-        end
-
-        BE[Backend<br/>Spring Boot<br/>Port 8080]
-
-        subgraph TestRunner["Test Runner"]
-            CUC[Cucumber Tests<br/>German Steps]
-            PO[Page Objects<br/>v1-Locatoren]
-            SHD[SelfHealingAppiumDriver<br/>Decorator Pattern]
-        end
-
-        subgraph HealingCore["Self-Healing Core"]
-            HO[HealingOrchestrator]
-            PC[PromptCache]
-            TA[TriageAgent]
-            LH[LocatorHealer]
-            SH[StepHealer]
-            MCE[McpContextEnricher]
-        end
-
-        MCP[Appium MCP Server<br/>45+ Tools]
-    end
-
-    LLM_C[Claude<br/>claude-sonnet-4-6]
-    LLM_G[GPT-4.1]
-    LLM_M[Codestral]
-    LLM_L[LM Studio<br/>Lokal]
-
-    CUC --> PO
-    PO --> SHD
-    SHD -->|findElement| AS
-    AS --> APP_V1
-    AS --> APP_V2
-    APP_V1 -.->|v1: OK| SHD
-    APP_V2 -.->|v2: Element nicht gefunden| SHD
-    SHD -->|Fehler| HO
-    HO --> PC
-    HO --> TA
-    TA --> LH
-    TA --> SH
-    HO -.->|optional| MCE
-    MCE --> MCP
-    MCP --> AS
-    TA --> LLM_C
-    TA --> LLM_G
-    TA --> LLM_M
-    TA --> LLM_L
-    LH --> LLM_C
-    APP_V1 --> BE
-    APP_V2 --> BE
-
-    style APP_V2 fill:#ffcccc
-    style LH fill:#ccffcc
-    style TA fill:#cceeff
-    style PC fill:#ffffcc
-```
-
-### Hybrid-Ansatz: Decorator + MCP
-
-Das Projekt kombiniert zwei Integrationsmuster:
-
-| Schicht | Muster | Einsatz |
-|---------|--------|---------|
-| **Test-Ausführung** | Decorator Pattern | `SelfHealingAppiumDriver` umwickelt `AppiumDriver` — Tests laufen schnell mit nativem Client |
-| **Healing-Agent** | MCP Client | Spring AI verbindet sich zum offiziellen `appium/appium-mcp` Server für Screenshots und DOM-Exploration |
-
-**Vorteile:**
-- Im Normalfall (kein Fehler) läuft der Test mit voller Geschwindigkeit
-- LLM wird **nur bei Fehlern** aufgerufen
-- MCP liefert reichhaltigen Kontext (Screenshot + DOM) für präziseres Healing
+Architekturdetails und Optionsabwägung siehe [ADR-001](ADR-001-appium-self-healing-architecture.md).
 
 ---
 
@@ -476,58 +254,18 @@ flowchart TD
 
 ## Projektstruktur
 
-```
-appium-self-healing/
-│
-├── backend/                              Spring Boot REST-API
-│   └── controller/ConnectionController   GET /api/v1/connections?from=X&to=Y
-│   └── service/ConnectionService         7 Demo-Verbindungen
-│   └── model/Connection                  Abfahrt, Ankunft, Umsteigen, Preis, Legs
-│
-├── android-app/                          Jetpack Compose App (Kotlin)
-│   └── app/src/main/                     Shared: MainActivity, Data Layer, Theme
-│   └── app/src/v1/                       v1-Flavor: Einzelseite, Original-IDs
-│   └── app/src/v2/                       v2-Flavor: Zwei Screens, neue IDs + FAB
-│
-├── self-healing-core/                    Wiederverwendbare Healing-Bibliothek
-│   ├── agent/TriageAgent                 LLM-Agent: Fehler-Klassifikation
-│   ├── healing/LocatorHealer             LLM-Agent: Locator-Reparatur
-│   ├── healing/StepHealer                LLM-Agent: Step-Logik-Reparatur
-│   ├── healing/McpContextEnricher        LLM-Agent: Kontext via Appium MCP
-│   ├── healing/EnvironmentChecker        Regelbasiert: HTTP Health Checks
-│   ├── healing/AppBugReporter            Regelbasiert: Bug-Report + Screenshot
-│   ├── healing/HealingOrchestrator       Orchestriert Pipeline (kein LLM)
-│   ├── healing/PromptCache               Caching (kein doppelter LLM-Call)
-│   ├── driver/SelfHealingAppiumDriver    Decorator um AppiumDriver
-│   ├── driver/SourceCodeResolver         Liest PageObject-Code aus Stack Trace
-│   ├── prompt/LocatorPromptCreator       Appium-optimierte Prompts
-│   ├── prompt/StepPromptCreator          Step-Level Prompts
-│   ├── prompt/TriagePromptCreator        Klassifikations-Prompts
-│   ├── model/                            FailureContext, HealingResult, HealingEvent, ...
-│   └── config/                           AutoConfiguration + Properties
-│
-├── integration-tests/                    Cucumber + Appium Tests
-│   ├── features/connection_search        3 Szenarien (direkt, Umstieg, leer)
-│   ├── features/self_healing             2 Szenarien mit Healing-Report
-│   ├── pages/SearchPage                  Page Object (v1-Locatoren)
-│   ├── pages/ResultPage                  Page Object (v1-Locatoren)
-│   └── steps/                            Deutsche Cucumber-Steps
-│
-├── benchmark/                            LLM-Vergleichs-Framework
-│   ├── BenchmarkRunner                   Orchestriert Teststrecken
-│   ├── model/BenchmarkReport             Vergleichstabelle
-│   └── tracks/*.yaml                     EASY / MEDIUM / HARD
-│
-├── docker/                               Docker Compose Setup
-│   ├── docker-compose.yml                Emulator + Appium + Backend + Runner
-│   ├── Dockerfile.backend                Backend-Image
-│   └── Dockerfile.tests                  Test-Runner-Image
-│
-├── ADR-001-...architecture.md            Architecture Decision Record
-├── TEST-RESULTS.md                       Test-Ergebnisse (multi-LLM, verify-fix)
-├── run-tests.sh                          Convenience-Script
-└── verify-fix.sh                         PR-Fix-Verifikation (Baseline vs. Branch)
-```
+| Modul | Inhalt |
+|---|---|
+| `backend/` | Spring Boot REST-API (`GET /api/v1/connections`, statische Demo-Daten) |
+| `android-app/` | Jetpack Compose App, Build-Flavors `v1`/`v2` mit divergierenden testTags |
+| `self-healing-core/` | Wiederverwendbare Healing-Bibliothek — Agenten, Orchestrator, Driver-Decorator, Prompt-Creators (Komponenten siehe [Healing-Pipeline](#healing-pipeline)) |
+| `self-healing-a2a/` | A2A-Modul (Server + Client), siehe [docs/a2a-phase5-protocol.md](docs/a2a-phase5-protocol.md) |
+| `integration-tests/` | Cucumber-Tests (deutsche Steps), Page Objects mit v1-Locatoren |
+| `benchmark/` | Multi-Provider Benchmark-Runner mit `tracks/*.yaml` (EASY/MEDIUM/HARD) |
+| `docker/` | `docker-compose.yml` + Dockerfiles für Backend und Test-Runner; Podman-Setup-Anleitung |
+| `docs/` | Architektur- und Protokoll-Detaildokumente (MCP-Vergleich, A2A-Protokoll) |
+| `scripts/` | Convenience-Skripte: `run-tests.sh`, `run-tests-podman.sh`, `verify-fix.sh` |
+| `config/` | Build-/Style-Konfiguration (Eclipse-Formatter) |
 
 ---
 
@@ -551,10 +289,11 @@ appium-self-healing/
 
 | Provider | Profil | Modell | Einsatz |
 |----------|--------|--------|---------|
-| Anthropic | `anthropic` | `claude-sonnet-4-6` | Standard (bestes Codeverständnis) |
+| Anthropic | `anthropic` (`anthropic-vision`) | `claude-sonnet-4-6` | Standard (bestes Codeverständnis), Vision-fähig |
 | OpenAI | `openai` | `gpt-4.1` | Alternative |
 | Mistral | `mistral` | `codestral-latest` | Code-spezialisiert |
-| Lokal | `local` | LM Studio (beliebig) | Offline, kostenfrei |
+| Lokal generisch | `local` | LM Studio (`LM_STUDIO_MODEL`) | Offline, kostenfrei |
+| Lokal vorkonfiguriert | `local-qwen3-30b`, `local-devstral`, `local-qwen3-next`, `local-glm-4-7-flash` | siehe [LM-Studio-Tabelle](#lokale-llms-mit-lm-studio) | Offline, mit Modell-spezifischen Tunings |
 
 ---
 
@@ -564,41 +303,13 @@ Das Benchmark-Modul vergleicht verschiedene LLMs anhand definierter Teststrecken
 
 ### Teststrecken
 
-```mermaid
-graph LR
-    subgraph EASY["EASY: ID-Renames"]
-        E1[input_from → departure_station]
-        E2[input_to → arrival_station]
-        E3[btn_search → fab_search]
-        E4[connection_list → results_container]
-        E5[text_from → label_departure]
-    end
-
-    subgraph MEDIUM["MEDIUM: Struktur-Änderungen"]
-        M1["Button → FAB<br/>(Widget-Typ)"]
-        M2["List Item → Card<br/>(Layout-Änderung)"]
-        M3["Text → Badge<br/>(Widget-Typ)"]
-    end
-
-    subgraph HARD["HARD: Navigation"]
-        H1["Einzelseite → Zwei Screens<br/>(Navigation-Änderung)"]
-        H2["Inline-Ergebnis → Separater Screen<br/>(Flow-Änderung)"]
-    end
-
-    EASY -->|5 Healings<br/>max 15s| MEDIUM
-    MEDIUM -->|7 Healings<br/>max 30s| HARD
-    HARD -->|9 Healings<br/>max 60s| RESULT[Vergleichsbericht]
-
-    style EASY fill:#c8e6c9
-    style MEDIUM fill:#fff9c4
-    style HARD fill:#ffcdd2
-```
+Drei Schwierigkeitsstufen aus `benchmark/src/main/resources/tracks/*.yaml`: **EASY** (reine ID-Renames, 5 Heals, max 15 s), **MEDIUM** (Widget-Typ- und Layout-Änderungen, 7 Heals, max 30 s), **HARD** (Navigations- und Flow-Änderungen, 9 Heals, max 60 s).
 
 ### Benchmark ausführen
 
 ```bash
 # Alle LLMs vergleichen (Docker-basiert — benötigt Emulator + Backend)
-./run-tests.sh benchmark
+./scripts/run-tests.sh benchmark
 
 # Oder manuell per Docker
 cd docker
@@ -627,6 +338,7 @@ Neben den Cloud-Providern können lokale Modelle über **LM Studio** eingebunden
 | `local-qwen3-next` | qwen3-coder-next | 48 GB | Q4_K_M |
 | `local-devstral` | devstral-small-2-2512 | 15 GB | Q4_K_M / Q8 |
 | `local-qwen3-30b` | qwen3-coder-30b | 19 GB | Q4_K_M |
+| `local-glm-4-7-flash` | zai-org/glm-4.7-flash (Reasoning) | ~16 GB | Q4_K_M |
 
 #### Voraussetzungen
 
@@ -643,8 +355,8 @@ Neben den Cloud-Providern können lokale Modelle über **LM Studio** eingebunden
 # Ein bestimmtes Modell testen
 LLM_PROVIDER=local-qwen3-30b ./gradlew :integration-tests:test
 
-# Alle drei lokalen Modelle nacheinander (Gradle)
-./gradlew benchmarkAll -PllmProviders=local-qwen3-next,local-devstral,local-qwen3-30b
+# Mehrere lokale Modelle nacheinander (Gradle)
+./gradlew benchmarkAll -PllmProviders=local-qwen3-30b,local-devstral,local-glm-4-7-flash
 ```
 
 #### Benchmark mit Docker Compose
@@ -663,7 +375,7 @@ docker compose up test-runner --build
 docker compose --profile benchmark up --build benchmark-runner
 ```
 
-Der `benchmark-runner` durchläuft automatisch alle sechs Provider (3 Cloud + 3 lokal). Lokale Modelle benötigen keine API-Keys, müssen aber in LM Studio aktiv geladen sein.
+Der `benchmark-runner` durchläuft automatisch die konfigurierten Provider. Lokale Modelle benötigen keine API-Keys, müssen aber in LM Studio aktiv geladen sein.
 
 ### Gemessene Metriken
 
@@ -675,81 +387,11 @@ Der `benchmark-runner` durchläuft automatisch alle sechs Provider (3 Cloud + 3 
 | `total_llm_cost_usd` | Geschätzte Kosten pro Lauf |
 | `false_positive_rate` | Fälschlich als geheilt markierte Locatoren |
 
-### Erwartetes Ergebnis (Beispiel)
+### Aktuelle Test-Ergebnisse
 
-```
-╔══════════════════════════════════════════════════════════════════════╗
-║               LLM SELF-HEALING BENCHMARK REPORT                     ║
-╠══════════════════════════════════════════════════════════════════════╣
-║ Provider        │ Success% │   Avg ms │   Tokens │  Est. Cost ║
-║─────────────────┼──────────┼──────────┼──────────┼────────────║
-║ anthropic       │   92.0%  │  2300ms  │    12500 │   $0.0450  ║
-║ openai          │   88.5%  │  1800ms  │    14200 │   $0.0710  ║
-║ mistral         │   78.0%  │  1500ms  │    11800 │   $0.0120  ║
-╠══════════════════════════════════════════════════════════════════════╣
-║ Success Rate by Difficulty:                                         ║
-║   anthropic:    EASY=100% MEDIUM=90% HARD=78%                       ║
-║   openai:       EASY=100% MEDIUM=85% HARD=72%                       ║
-║   mistral:      EASY=95%  MEDIUM=75% HARD=55%                       ║
-╚══════════════════════════════════════════════════════════════════════╝
-```
+Die kanonische Übersicht aller Test-Läufe (Cloud + lokal, MCP-Vergleich, verify-fix) liegt in [TEST-RESULTS.md](TEST-RESULTS.md). Letzte Ausführung: **20.04.2026** — alle sechs Provider (Anthropic, OpenAI, Mistral, Qwen3-Coder-30B, Devstral Small 2, GLM-4.7-Flash) heilen 6/6 Szenarien des `@very-hard-navigation`-Tracks.
 
-### Letzter Benchmark-Run: V2 Self-Healing mit Anthropic
-
-> **Datum:** 08.04.2026 · **Modell:** `claude-sonnet-4-6` · **App-Version:** v2 · **Dauer:** 8 min 24 s
-
-Alle 5 Szenarien bestanden (**5/5 PASSED**). Die Tests liefen gegen die
-v2-App, die sämtliche Element-IDs gegenüber v1 umbenannt hat.
-Das Self-Healing erkannte alle 8 Locator-Änderungen automatisch, ohne
-Anpassung der Page Objects.
-
-#### Geheilte Locatoren
-
-| v1-Locator (Page Object) | v2-Locator (geheilt durch LLM) | Kategorie |
-|--------------------------|-------------------------------|-----------|
-| `input_from` | `departure_station` | EASY — ID-Rename |
-| `input_to` | `arrival_station` | EASY — ID-Rename |
-| `btn_search` | `fab_search` | MEDIUM — Widget-Typ (Button → FAB) |
-| `connection_item` | `journey_card` | MEDIUM — Layout (List → Card) |
-| `text_from` | `label_departure` | EASY — ID-Rename |
-| `text_to` | `label_arrival` | EASY — ID-Rename |
-| `text_transfers` | `label_changes` | EASY — ID-Rename |
-| `text_no_results` | `empty_state_text` | EASY — ID-Rename |
-
-#### Token-Verbrauch
-
-| Agent | Aufrufe | Ø Prompt | Ø Completion | Ø Total | Gesamt |
-|-------|---------|----------|-------------|---------|--------|
-| Triage Agent | 8 | ~3.150 | ~113 | ~3.265 | 26.121 |
-| LocatorHealer | 8 | ~6.082 | ~934 | ~6.891 | 55.131 |
-| **Summe** | **16** | | | | **81.252** |
-
-#### In-Memory PromptCache
-
-| Metrik | Wert |
-|--------|------|
-| Cache Misses | 8 (je ein Call pro einzigartigem Locator) |
-| Cache Hits | 16 (Folge-Szenarien nutzen gecachte Mappings) |
-| Hit-Rate | 67 % |
-
-> **Hinweis zum Anthropic Prompt-Caching:** Konfiguriert via `cache-options.strategy: system-only`,
-> jedoch zeigten alle Calls `creation: 0, read: 0` Tokens. Die System-Prompts
-> (~600–800 Tokens) liegen unterhalb der Mindestgröße von Anthropic (~1.024 Tokens).
-> Das In-Memory-Caching kompensiert dies effektiv innerhalb einer Test-Session.
-
-#### Szenarien
-
-| # | Szenario | Ergebnis |
-|---|----------|----------|
-| 1 | Direkte Verbindung finden | ✅ PASSED |
-| 2 | Verbindung mit Umstieg | ✅ PASSED |
-| 3 | Keine Verbindung gefunden | ✅ PASSED |
-| 4 | Einfache ID-Änderung wird geheilt | ✅ PASSED |
-| 5 | Verbindungssuche mit Umstieg nach UI-Redesign | ✅ PASSED |
-
-#### Regressions-Check (v1)
-
-Anschließend liefen die gleichen Tests gegen die **v1-App** (unveränderte IDs) — ebenfalls **5/5 PASSED** in 2 min 31 s, ohne dass Self-Healing aktiv werden musste. Die Änderungen sind somit rückwärtskompatibel.
+> **Hinweis zum Anthropic Prompt-Caching:** Konfiguriert via `cache-options.strategy: system-only`, jedoch zeigten alle Calls `creation: 0, read: 0` Tokens — die System-Prompts (~600–800 Tokens) liegen unterhalb der Mindestgröße von Anthropic (~1024 Tokens). Das In-Memory-`PromptCache` kompensiert dies innerhalb einer Test-Session (typische Hit-Rate: 60–70 %).
 
 ---
 
@@ -773,13 +415,13 @@ self-healing:
 
 ```bash
 # Per Umgebungsvariable
-LLM_PROVIDER=openai ./run-tests.sh v2
+LLM_PROVIDER=openai ./scripts/run-tests.sh v2
 
 # Per Spring-Profil
 ./gradlew :integration-tests:test -Dspring.profiles.active=mistral
 
 # Lokal mit LM Studio
-LLM_PROVIDER=local ./run-tests.sh v2
+LLM_PROVIDER=local ./scripts/run-tests.sh v2
 ```
 
 ### PR-Erstellung für geheilte Locatoren
@@ -840,12 +482,7 @@ Der Screenshot wird ohnehin schon im `FailureContext` mitgeführt (für Debug-Re
 
 ## Roadmap
 
-- [x] **Phase 1**: Gradle-Monorepo, Backend, Page Objects, SelfHealingDriver, Cucumber-Tests
-- [x] **Phase 2**: App v2, Prompt-Optimierung, StepHealer, MCP-Integration, Benchmark
-- [x] **Phase 3**: Root-Cause-Analyse (EnvironmentChecker, AppBugReporter)
-- [x] **Phase 4**: Benchmark-Automatisierung (vollständiger LLM-Vergleich)
-- [x] **Phase 5 (teilweise)**: PR-Erstellung für geheilte Locatoren inkl. Dry-Run (Anthropic + lokaler Devstral verifiziert) + Vision-Healing-Modus (Screenshot-Anhang via Spring AI Media, Profil `anthropic-vision`)
-- [ ] **Phase 5 (offen)**: iOS, A2A-Integration
+Phasen 1–4 vollständig umgesetzt; Phase 5 weitgehend abgeschlossen (PR-Erstellung, Vision-Healing, A2A-Modul live), iOS offen. Detail-Status siehe [ADR-001 — Action Items](ADR-001-appium-self-healing-architecture.md#action-items).
 
 ---
 
