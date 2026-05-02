@@ -1,8 +1,8 @@
 # ADR-001: Appium Self-Healing Architecture
 
-**Status:** Proposed
-**Date:** 2026-04-04
-**Deciders:** Daniel Keiss
+**Status:** Akzeptiert (Phasen 1–4 vollständig umgesetzt, Phase 5 teilweise — PR-Erstellung + Vision-Healing live, A2A-Modul live, iOS offen)
+**Datum:** 2026-04-04 (Entscheidung) · 2026-04-20 (Status-Update)
+**Entscheider:** Daniel Keiss
 
 ## Context
 
@@ -39,9 +39,13 @@ appium-self-healing/
 ├── backend/                          # Spring Boot 4 REST-API (Zugverbindungen)
 ├── android-app/                      # Android-App (Jetpack Compose, versioniert)
 ├── self-healing-core/                # Wiederverwendbare Self-Healing-Bibliothek
+├── self-healing-a2a/                 # A2A-Protokoll-Modul (Server + Client)
 ├── integration-tests/                # Cucumber + Appium Tests
 ├── benchmark/                        # LLM-Vergleichs-Framework
 ├── docker/                           # Docker-Compose-Setup
+├── docs/                             # Architektur- und Protokoll-Detaildokumente
+├── scripts/                          # Convenience-Skripte (run-tests, verify-fix)
+├── config/                           # Build-/Style-Konfiguration (Eclipse-Formatter etc.)
 ├── settings.gradle.kts
 └── build.gradle.kts
 ```
@@ -64,83 +68,11 @@ appium-self-healing/
 - **Teststufe (Integration-Tests):** Appium Java Client direkt, eingewickelt in einen `SelfHealingAppiumDriver` (Decorator-Pattern wie AICurator)
 - **Agent-Stufe (Self-Healing-Core):** Spring AI MCP Client verbindet sich zum offiziellen `appium/appium-mcp` Server. Der Healing-Agent nutzt MCP-Tools (Screenshot, Page Source, Element-Suche) für kontextreiche Analyse.
 
-```
-┌─────────────────────────────────────────────────────────────────┐
-│                     Integration Tests                           │
-│  Cucumber Steps → Page Objects → SelfHealingAppiumDriver        │
-│                                      │                          │
-│                              findElement() schlägt fehl         │
-│                                      │                          │
-│                                      ▼                          │
-│                            ┌─────────────────┐                  │
-│                            │  Healing Agent   │                  │
-│                            │  (Spring AI)     │                  │
-│                            └────────┬────────┘                  │
-│                                     │                           │
-│                    ┌────────────────┼────────────────┐          │
-│                    ▼                ▼                ▼          │
-│              Page Source      Screenshot       Test-Code        │
-│              (Appium)        (Appium MCP)    (Filesystem)       │
-│                    │                │                │          │
-│                    └────────────────┼────────────────┘          │
-│                                     ▼                           │
-│                               LLM Analyse                       │
-│                          (Claude/GPT/Mistral)                   │
-│                                     │                           │
-│                                     ▼                           │
-│                          Geheilter Locator                      │
-│                          + Code-Fix-Vorschlag                   │
-└─────────────────────────────────────────────────────────────────┘
-```
-
-**Begründung:**
-- Tests laufen performant mit dem nativen Appium Java Client
-- Der MCP-Server wird vom Healing-Agent genutzt, um reichhaltigen Kontext zu sammeln (Screenshots, DOM-Exploration)
-- Kein eigener MCP-Server nötig -- der offizielle `appium/appium-mcp` läuft als Sidecar-Prozess
+**Begründung:** Tests laufen performant mit dem nativen Appium Java Client; der MCP-Server liefert dem Healing-Agent zusätzlichen Kontext (Screenshots, DOM-Exploration) ohne eigene Server-Implementation — der offizielle `appium/appium-mcp` läuft als Sidecar-Prozess.
 
 ### 2. Self-Healing-Core: Agent-Pipeline
 
-Die Pipeline besteht aus **4 LLM-basierten Agenten** und **2 regelbasierten Handlern**, koordiniert durch den `HealingOrchestrator`:
-
-```
-Test schlägt fehl
-        │
-        ▼
-┌──────────────────┐
-│  PromptCache     │  Cache-Hit? → Sofort wiederverwenden
-└────────┬─────────┘
-         │ MISS
-         ▼
-┌──────────────────┐
-│ McpContext-       │  ← Stufe 0 (optional): Kontext-Anreicherung
-│ Enricher (LLM)   │     Screenshot + DOM via Appium MCP
-└────────┬─────────┘
-         │
-         ▼
-┌──────────────────┐
-│  Triage Agent    │  ← Stufe 1: Root-Cause-Analyse (LLM)
-│  (Klassifikation)│
-└────────┬─────────┘
-         │
-    ┌────┼────────┬───────────────┐
-    ▼    ▼        ▼               ▼
-┌──────┐ ┌────┐ ┌──────────┐ ┌──────────┐
-│LOCATOR│ │STEP│ │ENVIRONMENT│ │ APP BUG  │  ← Stufe 2: Handler
-│HEALER │ │HEAL│ │ CHECKER   │ │ REPORTER │
-│ (LLM) │ │(LLM)│ │(regelbasiert)│ │(regelbasiert)│
-└───┬───┘ └──┬─┘ └─────┬────┘ └─────┬────┘
-    │        │          │             │
-    ▼        ▼          ▼             ▼
-  Reparatur Code-     Diagnose     Bug-Report
-  zur       Vorschlag + Retry      (kein Heal)
-  Laufzeit
-    │
-    ▼
-┌──────────────────┐
-│ Stufe 3:         │  Cache + HealingEvent publizieren
-│ Post-Processing  │
-└──────────────────┘
-```
+Die Pipeline besteht aus **4 LLM-basierten Agenten** und **2 regelbasierten Handlern**, koordiniert durch den `HealingOrchestrator`. Visualisierter Flow siehe [README — Healing-Pipeline](README.md#healing-pipeline).
 
 **LLM-basierte Agenten (4):**
 
@@ -163,127 +95,17 @@ Test schlägt fehl
 - Bei Misserfolg: Eskaliert (max. N Versuche konfigurierbar)
 - Hinweis: Ein separater Verification Agent ist geplant, aktuell übernimmt der `SelfHealingAppiumDriver` die Retry-Logik
 
-**Spring AI Implementation:**
-
-```java
-// LLM-Agent: TriageAgent -- nutzt Spring AI ChatClient mit Structured Output
-public class TriageAgent {
-    private final ChatClient chatClient;
-
-    public TriageResult analyze(FailureContext context) {
-        return chatClient.prompt()
-            .system(triageSystemPrompt)
-            .user(buildUserPrompt(context))
-            .call()
-            .entity(TriageResult.class);
-    }
-}
-
-// LLM-Agent: McpContextEnricher -- nutzt MCP-Tools für Kontext-Sammlung
-public class McpContextEnricher {
-    private final ChatClient chatClient;
-    private final ToolCallbackProvider mcpToolProvider; // Appium MCP
-
-    public FailureContext enrich(FailureContext context) {
-        chatClient.prompt()
-            .system(enrichmentSystemPrompt)
-            .user(buildEnrichmentPrompt(context))
-            .tools(mcpToolProvider)
-            .call()
-            .content();
-        // ...
-    }
-}
-
-// Regelbasiert: EnvironmentChecker -- HTTP Health Checks, kein LLM
-public class EnvironmentChecker {
-    private final HttpClient httpClient;
-
-    public EnvironmentReport check(FailureContext context) {
-        // HTTP probes gegen Backend, Appium Server
-        // Page-Source-Heuristik (leer = Emulator-Problem)
-    }
-}
-
-// Regelbasiert: AppBugReporter -- Strukturierter Report, kein LLM
-public class AppBugReporter {
-    public BugReport report(FailureContext context, TriageResult triage) {
-        // Severity-Ableitung aus Triage-Confidence
-        // JSON-Persistierung + Screenshot + Event-Publishing
-    }
-}
-```
+**Spring AI Implementation:** Alle LLM-Agenten nutzen `ChatClient` mit Structured Output (`.entity(...)`); `McpContextEnricher` zusätzlich mit `ToolCallbackProvider` für die MCP-Tools. Konkrete Klassen liegen in `self-healing-core/src/main/java/de/keiss/selfhealing/core/` (`agent/`, `healing/`).
 
 ### 3. Demo-App: Versionierte Zugverbindungs-App
 
-**Backend (Spring Boot 4):**
+Backend (Spring Boot 4, REST-Endpoint `GET /api/v1/connections`) liefert statische Demo-Daten an die Android-App. Die App nutzt Jetpack Compose mit zwei Build-Flavors (`UI_VERSION=v1|v2`), die bewusst unterschiedliche Element-IDs, Layouts und Navigationsflüsse haben. Dadurch brechen v1-Tests zuverlässig bei v2 → Self-Healing wird ausgelöst.
 
-```
-backend/
-├── src/main/java/.../
-│   ├── BackendApplication.java
-│   ├── controller/
-│   │   └── ConnectionController.java    # GET /api/v1/connections?from=X&to=Y
-│   ├── model/
-│   │   └── Connection.java              # Abfahrt, Ankunft, Umsteigen, Preis
-│   └── service/
-│       └── ConnectionService.java       # Statische Demo-Daten
-```
-
-**Android-App (Jetpack Compose, versioniert):**
-
-```
-android-app/
-├── src/main/java/.../
-│   ├── MainActivity.java
-│   ├── ui/
-│   │   ├── v1/                          # Version 1: Standard-Layout
-│   │   │   ├── SearchScreen.java        # Einfache Suche
-│   │   │   └── ResultScreen.java        # Liste
-│   │   └── v2/                          # Version 2: Geändertes Layout
-│   │       ├── SearchScreen.java        # Redesigned (andere IDs, Struktur)
-│   │       └── ResultScreen.java        # Cards statt Liste
-│   └── config/
-│       └── AppConfig.java               # UI_VERSION=v1|v2 (Build-Config)
-```
-
-**Versionierung:**
-- Die App-Version wird über eine Build-Variable (`UI_VERSION`) gesteuert
-- v1 und v2 haben **bewusst unterschiedliche** Element-IDs, Layouts und Navigationsflüsse
-- Dadurch brechen v1-Tests zuverlässig bei v2 → Self-Healing wird ausgelöst
-
-**Geplante UI-Änderungen v1 → v2:**
-
-| Element | v1 | v2 | Heal-Schwierigkeit |
-|---------|----|----|-------------------|
-| Startbahnhof-Input | `@+id/input_from` | `@+id/departure_station` | Einfach (ID-Rename) |
-| Suchbutton | `@+id/btn_search` | `@+id/fab_search` (FAB) | Mittel (Typ-Änderung) |
-| Ergebnisliste | `RecyclerView` | `LazyColumn` (Compose) | Schwer (Struktur) |
-| Detailansicht | Neues Activity | BottomSheet | Schwer (Navigation) |
+Konkrete Locator-Änderungen v1 → v2 siehe [README — Detaillierte Locator-Änderungen](README.md#detaillierte-locator-änderungen).
 
 ### 4. Test-Architektur: Cucumber + Appium 3
 
-```
-integration-tests/
-├── src/test/java/.../
-│   ├── runner/
-│   │   └── TestRunner.java              # Cucumber Runner
-│   ├── steps/
-│   │   ├── ConnectionSearchSteps.java   # Schritte für Verbindungssuche
-│   │   └── SelfHealingSteps.java        # Self-Healing Konfiguration
-│   ├── pages/
-│   │   ├── SearchPage.java              # Page Object: Suche
-│   │   └── ResultPage.java              # Page Object: Ergebnis
-│   ├── driver/
-│   │   └── SelfHealingAppiumDriver.java # Decorator um AppiumDriver
-│   └── config/
-│       └── TestConfig.java              # Spring-Konfiguration
-├── src/test/resources/
-│   └── features/
-│       ├── connection_search.feature
-│       └── self_healing.feature
-└── build.gradle.kts
-```
+Modul `integration-tests/` enthält Page Objects (`SearchPage`, `ResultPage` mit v1-Locatoren), den `SelfHealingAppiumDriver`-Decorator, Cucumber-Runner sowie Feature-Files mit deutschen Steps.
 
 **Beispiel-Feature:**
 
@@ -310,26 +132,7 @@ Feature: Zugverbindung suchen
 
 ### 5. LLM-Benchmark-Framework
 
-```
-benchmark/
-├── src/main/java/.../
-│   ├── BenchmarkRunner.java             # Orchestriert Teststrecken
-│   ├── model/
-│   │   ├── BenchmarkRun.java            # Einzelner Lauf
-│   │   ├── HealingMetrics.java          # Metriken pro Healing-Versuch
-│   │   └── BenchmarkReport.java         # Aggregierter Bericht
-│   ├── provider/
-│   │   ├── LlmProviderConfig.java       # Multi-Provider Setup
-│   │   └── TestTrack.java               # Definition einer Teststrecke
-│   └── report/
-│       └── ComparisonReportGenerator.java
-├── src/main/resources/
-│   └── tracks/
-│       ├── easy-locator-changes.yaml    # Einfache ID-Änderungen
-│       ├── medium-structural.yaml       # Struktur-Änderungen
-│       └── hard-navigation.yaml         # Navigations-Änderungen
-└── build.gradle.kts
-```
+Modul `benchmark/` orchestriert pro Teststrecke (`tracks/easy-locator-changes.yaml`, `medium-structural.yaml`, `hard-navigation.yaml`) und LLM-Provider einen Lauf, sammelt `HealingMetrics` und aggregiert sie zu einem `BenchmarkReport`.
 
 **Teststrecken-Definition (YAML):**
 
@@ -367,125 +170,19 @@ Vergleichsbericht generieren (Tabelle + optional HTML)
 
 ### 6. Docker-Setup
 
-```yaml
-# docker/docker-compose.yml
-services:
-  android-emulator:
-    image: budtmo/docker-android:emulator_14.0
-    ports:
-      - "6080:6080"    # noVNC (Browser-Zugriff auf Emulator)
-      - "5555:5555"    # ADB
-    environment:
-      - EMULATOR_DEVICE=pixel_6
-      - WEB_VNC=true
-    devices:
-      - /dev/kvm       # KVM-Beschleunigung (Linux)
-
-  appium-server:
-    image: appium/appium:latest
-    ports:
-      - "4723:4723"
-    depends_on:
-      - android-emulator
-    environment:
-      - ANDROID_DEVICE_HOST=android-emulator
-
-  appium-mcp:
-    image: node:22-slim
-    command: npx appium-mcp@latest
-    environment:
-      - APPIUM_HOST=appium-server
-      - APPIUM_PORT=4723
-
-  backend:
-    build: ../backend
-    ports:
-      - "8080:8080"
-
-  self-healing-runner:
-    build: ../integration-tests
-    depends_on:
-      - appium-server
-      - appium-mcp
-      - backend
-    environment:
-      - APPIUM_URL=http://appium-server:4723
-      - BACKEND_URL=http://backend:8080
-      - MCP_SERVER_URL=appium-mcp
-      - SPRING_AI_PROVIDER=claude  # oder: chatgpt, mistral, local
-    volumes:
-      - ./results:/app/results
-```
-
-**Ausführung:**
-
-```bash
-# Einfacher Testlauf
-docker compose up --build
-
-# Benchmark mit verschiedenen LLMs
-docker compose run self-healing-runner --profile=claude
-docker compose run self-healing-runner --profile=chatgpt
-docker compose run self-healing-runner --profile=mistral
-
-# Vergleichsbericht
-docker compose run self-healing-runner --benchmark --report
-```
+Stack aus `android-emulator` (`budtmo/docker-android`, KVM-beschleunigt), `appium-server` (Port 4723), optionalem `appium-mcp`-Sidecar, `backend` (Port 8080) und `test-runner`. Provider-Auswahl über `SPRING_PROFILES_ACTIVE` / `LLM_PROVIDER`. Aktuelle Konfiguration siehe [docker/docker-compose.yml](docker/docker-compose.yml); Setup unter Windows/WSL2 siehe [docker/PODMAN.md](docker/PODMAN.md).
 
 ---
 
 ## Options Considered
 
-### Option A: Reiner MCP-Ansatz (Agent steuert alles über MCP)
+| Option | Komplexität | LLM-Kosten | Healing-Qualität | Time-to-MVP |
+|---|---|---|---|---|
+| **A — Reiner MCP-Ansatz** (Agent steuert alles via MCP) | Hoch | $$$ | Hoch | 6 Wochen |
+| **B — Hybrid: Decorator + MCP** ← gewählt | Mittel | $ | Hoch | 4 Wochen |
+| **C — Reiner Decorator** (wie AICurator, ohne MCP) | Niedrig | $ | Mittel | 2 Wochen |
 
-| Dimension | Assessment |
-|-----------|------------|
-| Komplexität | Hoch |
-| Performance | Niedrig (jede Interaktion über LLM) |
-| Flexibilität | Sehr hoch |
-| Kosten (LLM-Tokens) | Sehr hoch |
-
-**Pros:** Maximale Flexibilität, Agent kann frei explorieren, kein Test-Code nötig
-**Cons:** Extrem langsam, teuer, nicht reproduzierbar, kein Cucumber-Integration
-
-### Option B: Hybrid-Ansatz (Decorator + MCP für Healing) ← **Gewählt**
-
-| Dimension | Assessment |
-|-----------|------------|
-| Komplexität | Mittel |
-| Performance | Hoch (LLM nur bei Fehler) |
-| Flexibilität | Hoch |
-| Kosten (LLM-Tokens) | Niedrig-Mittel |
-
-**Pros:** Schnelle Tests im Normalfall, LLM nur bei Bedarf, volle Cucumber-Integration, MCP für reichhaltigen Kontext
-**Cons:** Erfordert Decorator-Implementation, zwei Integrationspfade
-
-### Option C: Reiner Decorator-Ansatz (wie AICurator, ohne MCP)
-
-| Dimension | Assessment |
-|-----------|------------|
-| Komplexität | Niedrig |
-| Performance | Hoch |
-| Flexibilität | Mittel |
-| Kosten (LLM-Tokens) | Niedrig |
-
-**Pros:** Einfachste Implementation, bewährt (AICurator), kein MCP-Setup
-**Cons:** Kein Screenshot-/Explorations-Kontext für den Agent, weniger intelligentes Healing
-
----
-
-## Trade-off Analysis
-
-| Kriterium | Option A (MCP-only) | Option B (Hybrid) | Option C (Decorator-only) |
-|-----------|---------------------|-------------------|--------------------------|
-| Time-to-MVP | 6 Wochen | 4 Wochen | 2 Wochen |
-| Healing-Qualität | Hoch | Hoch | Mittel |
-| Testlauf-Dauer | Minuten/Test | Sekunden + Heal-Time | Sekunden + Heal-Time |
-| LLM-Kosten/Lauf | $$$ | $ | $ |
-| Erweiterbarkeit | Gut | Sehr gut | Eingeschränkt |
-| Root-Cause-Analyse | Natürlich | Gut integrierbar | Schwierig |
-
-**Option B** bietet den besten Kompromiss: Tests laufen schnell mit nativem Appium-Client, aber bei Fehlern steht dem Healing-Agent der volle MCP-Kontext (Screenshot, DOM-Exploration) zur Verfügung. Die Drei-Stufen-Agent-Pipeline ermöglicht später die Root-Cause-Analyse.
+**A** ist extrem teuer und langsam (jede Interaktion über LLM), keine Cucumber-Integration. **C** ist die einfachste Variante, lässt aber Screenshot- und Explorations-Kontext liegen. **B** kombiniert die schnelle Test-Ausführung von C mit dem reichen Kontext von A — Tests laufen mit nativem Appium-Client, der MCP-Kontext kommt nur bei Fehlern hinzu. Die Agent-Pipeline ermöglicht zudem Root-Cause-Analyse jenseits reinem Locator-Healing.
 
 ---
 
@@ -510,58 +207,20 @@ docker compose run self-healing-runner --benchmark --report
 
 ---
 
-## Technologie-Stack Zusammenfassung
+## Technologie-Stack
 
-| Komponente | Technologie |
-|-----------|------------|
-| Sprache | Java 25 |
-| Build | Gradle 9.4.1 (Kotlin DSL) |
-| Backend | Spring Boot 4.0.5 |
-| Android-App | Jetpack Compose, versioniert (v1/v2) |
-| Test-Framework | Cucumber 7.34 + Appium Java Client 10 |
-| AI-Framework | Spring AI 2.0 |
-| MCP-Server | appium/appium-mcp (offiziell, TypeScript) |
-| MCP-Client | spring-ai-starter-mcp-client |
-| LLM-Provider | Claude, GPT, Mistral, LM Studio (lokal) |
-| Container | Docker Compose |
-| Android-Emulator | budtmo/docker-android |
-| CI/CD | GitHub Actions (später) |
+Aktuelle Versionen siehe [README — Technologie-Stack](README.md#technologie-stack).
 
 ---
 
 ## Action Items
 
-### Phase 1: Foundation (MVP)
-1. [ ] Gradle-Monorepo mit allen Modulen aufsetzen
-2. [ ] Spring Boot 4 Backend mit Zugverbindungs-API implementieren
-3. [ ] Android-App v1 mit Jetpack Compose erstellen (Suche + Ergebnis)
-4. [ ] Cucumber-Tests mit Appium und Page Objects schreiben
-5. [ ] `SelfHealingAppiumDriver` (Decorator) implementieren
-6. [ ] `LocatorHealer` mit Spring AI ChatClient implementieren
-7. [ ] Docker-Compose-Setup für lokale Ausführung erstellen
-
-### Phase 2: Self-Healing Demo
-8. [ ] Android-App v2 mit geänderten IDs/Layouts erstellen
-9. [ ] Versions-Umschaltung (Build-Variable) implementieren
-10. [ ] Prompt-Templates für Locator-Healing optimieren
-11. [ ] `StepHealer` für Step-Level-Reparatur implementieren
-12. [ ] Appium MCP Server als Sidecar integrieren
-13. [ ] MCP-basierte Kontext-Sammlung (Screenshot, DOM) einbauen
-
-### Phase 3: Root-Cause-Analyse
-14. [ ] `TriageAgent` mit Fehler-Klassifikation implementieren
-15. [ ] `EnvironmentChecker` für Infrastruktur-Probleme implementieren
-16. [ ] `AppBugReporter` für Bug-Dokumentation implementieren
-17. [ ] Drei-Stufen-Pipeline (Triage → Handler → Verification) verdrahten
-
-### Phase 4: LLM-Benchmark
-18. [ ] Benchmark-Runner mit Teststrecken-YAML implementieren
-19. [ ] Multi-Provider-Konfiguration (Claude, GPT, Mistral, lokal) einrichten
-20. [ ] Metriken-Sammlung (Erfolgsrate, Zeit, Tokens, Kosten) implementieren
-21. [ ] Vergleichsbericht-Generator erstellen
-
-### Phase 5: Erweiterungen
-22. [ ] iOS-App-Modul hinzufügen
-23. [x] PR-Erstellung für geheilte Locatoren (wie AICurator) — `AutoFixPrCreator` + JGit + kohsuke/github-api, Dry-Run-Modus via `SELF_HEALING_GIT_PR_DRY_RUN`, Submodul-aware Pfad-Resolver, verifiziert mit Anthropic Sonnet und lokalem Devstral. Siehe README-Abschnitt "PR-Erstellung für geheilte Locatoren".
-24. [x] Vision-Model-basiertes Healing (Screenshot-Analyse) — `self-healing.vision.enabled` schaltet Anhängen des Failure-Screenshots als Spring AI `Media` (image/png) an die `LocatorHealer`-Prompt frei. Profil `anthropic-vision` als Referenz-Setup mit Claude Sonnet 4.6. Siehe README-Abschnitt "Vision-Healing".
-25. [ ] A2A-Integration für Multi-Agent-Kommunikation
+- **Phase 1 (MVP):** ✅ Monorepo, Backend, App v1, Cucumber-Tests, `SelfHealingAppiumDriver`, `LocatorHealer`, Docker-Setup.
+- **Phase 2 (Self-Healing Demo):** ✅ App v2, Versions-Flavor, Prompt-Templates, `StepHealer`, MCP-Sidecar + Kontext-Sammlung. Hinweis: `appium-mcp` kann laufende Session nicht sharen → Default `self-healing.mcp.enabled=false`, siehe [docs/mcp-comparison-report.md](docs/mcp-comparison-report.md).
+- **Phase 3 (Root-Cause-Analyse):** ✅ `TriageAgent`, `EnvironmentChecker`, `AppBugReporter`, Drei-Stufen-Pipeline.
+- **Phase 4 (LLM-Benchmark):** ✅ Benchmark-Runner, Multi-Provider (Claude, GPT, Mistral, lokal Qwen3-30B/Devstral/GLM-4.7-Flash), Metriken-Sammlung, Vergleichsbericht.
+- **Phase 5 (Erweiterungen):**
+  - ✅ PR-Erstellung für geheilte Locatoren (`AutoFixPrCreator` + JGit + kohsuke/github-api, Dry-Run via `SELF_HEALING_GIT_PR_DRY_RUN`).
+  - ✅ Vision-Healing (`self-healing.vision.enabled`, Profil `anthropic-vision`).
+  - ✅ A2A-Integration (Modul `self-healing-a2a`, siehe [docs/a2a-phase5-protocol.md](docs/a2a-phase5-protocol.md)).
+  - ⬜ iOS-App-Modul.

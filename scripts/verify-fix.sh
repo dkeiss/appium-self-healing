@@ -7,12 +7,12 @@
 # Only the test-runner container is rebuilt per branch, saving ~3-5 min.
 #
 # Usage:
-#   ./verify-fix.sh <fix-branch>           # Compare master vs fix-branch
-#   ./verify-fix.sh <fix-branch> openai    # Use a specific LLM provider
+#   ./scripts/verify-fix.sh <fix-branch>           # Compare master vs fix-branch
+#   ./scripts/verify-fix.sh <fix-branch> openai    # Use a specific LLM provider
 # ────────────────────────────────────────────────────────────────────
 
 set -euo pipefail
-cd "$(dirname "$0")"
+cd "$(dirname "$0")/.."
 
 FIX_BRANCH="${1:?Usage: $0 <fix-branch> [llm-provider]}"
 LLM_PROVIDER="${2:-anthropic}"

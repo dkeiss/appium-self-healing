@@ -1,8 +1,8 @@
-# Phase 5 – A2A (Agent2Agent) Integration: Change Protocol
+# Phase 5 – A2A (Agent2Agent) Integration: Änderungsprotokoll
 
-**Date:** 2026-04-19
+**Datum:** 2026-04-19
 **Branch:** `claude/wonderful-banzai-3327ab`
-**Author:** Claude Sonnet 4.6 (automated)
+**Autor:** Claude Sonnet 4.6 (automatisiert)
 
 ---
 
@@ -193,54 +193,13 @@ Alle Locatoren geändert zwischen v1 und v2.
 
 ---
 
-## 5. Benchmark-Ergebnisse
+## 5. Verhaltens-Verifikation und Bug-Fixes
 
-Benchmark-Lauf am 2026-04-19 gegen App v2 (alle Locatoren geändert).
-Tag-Filter: `@self-healing` — 6 Szenarien je Provider.
-Logs: `build/reports/benchmark-<provider>.log`
+Nach der A2A-Refaktorierung wurde das Healing-Verhalten gegen App v2 (alle Locatoren geändert) verifiziert. Der Lauf vom 2026-04-19 zeigte: das `LocatorHealer`-Interface verändert das Heilverhalten **nicht** — Cloud-Anthropic/OpenAI bleiben bei 6/6, Cloud-Mistral scheiterte vor den Retry-Fixes (s.u.) noch an `leg_platform`.
 
-### 5.1 Cloud-Provider (API verfügbar)
+> Aktuelle, kanonische Benchmark-Zahlen siehe [TEST-RESULTS.md](../TEST-RESULTS.md). Dieser Abschnitt dokumentiert nur den Refaktorierungs- und Bug-Fix-Verlauf.
 
-| Provider | Modell | Szenarien | Geheilt | Gesamtzeit | Ø Heilzeit/Locator | Anmerkung |
-|----------|--------|-----------|---------|------------|-------------------|-----------|
-| Anthropic | claude-3-5-sonnet | 6 | **6/6** ✅ | 9 min 45 s | ~14 s | Inkl. Cache-Hits für Folge-Szenarien |
-| OpenAI | gpt-4o | 6 | **6/6** ✅ | 7 min 44 s | ~5 s | Schnellste API-Antwortzeiten |
-| Mistral | mistral-large-latest | 6 | **5/6** ⚠️ | 7 min 47 s | ~4 s | BottomSheet-Fahrplan FAILED (`leg_platform` → halluziniertes `leg_item_0_platform`) |
-
-**Ausgeheilte Locatoren (Anthropic, erste LLM-Auflösung ohne Cache):**
-
-| Alter Locator | Neuer Locator | Heilzeit |
-|---------------|---------------|----------|
-| `By.id: input_from` | `By.id: departure_station` | 9 932 ms |
-| `By.id: input_to` | `By.id: arrival_station` | 10 774 ms |
-| `By.id: btn_search` | `AccessibilityId: Suche starten` | 22 170 ms |
-| `By.id: connection_item` | `By.id: journey_card` | 9 507 ms |
-| `By.id: text_from` | `By.id: label_departure` | 9 423 ms |
-| `By.id: text_to` | `By.id: label_arrival` | 16 966 ms |
-| `By.id: text_transfers` | `By.id: label_changes` | 16 995 ms |
-| `By.id: text_no_results` | `By.id: empty_state_text` | 9 407 ms |
-| `By.id: leg_train_number` | `AccessibilityId: Zug ICE ICE 123` | 16 826 ms |
-| `By.id: leg_platform` | `AndroidUIAutomator: descriptionStartsWith("Gleis")` | 16 962 ms |
-
-### 5.2 Lokale Provider (LM Studio nicht gestartet)
-
-| Provider | Ergebnis | Ursache |
-|----------|---------|---------|
-| local-qwen3-next | **N/A** | `Connection refused` zu `host.docker.internal:1234` |
-| local-devstral | **N/A** | `Connection refused` zu `host.docker.internal:1234` |
-| local-qwen3-30b | **N/A** | `Connection refused` zu `host.docker.internal:1234` |
-
-Die lokalen Provider setzen einen laufenden LM Studio Server auf Port 1234 voraus.
-Benchmark-Logs zeigen 3 Versuche × Spring AI Retry (9×) pro Szenario, bevor aufgegeben wird.
-
-### 5.3 Fazit
-
-- Die A2A-Refaktorierung hat das Healing-Verhalten der Cloud-Provider **nicht verändert**.
-- OpenAI ist mit ~5 s/Locator das schnellste Cloud-Modell.
-- Anthropic heilt im Benchmark alle 6/6 (inkl. BottomSheet) durch Cache-Wiederverwendung aus dem ersten Szenario.
-- Mistral scheitert konsistent an `leg_platform` (halluziniert eine ID statt UI-Automator-Selektor).
-
-### 5.4 Bug-Fixes: Retry-Mechanismus (Post-Benchmark)
+### 5.1 Bug-Fixes: Retry-Mechanismus (Post-Benchmark)
 
 Beim Benchmark-Lauf wurden zwei zusammenhängende Bugs im Retry-Mechanismus entdeckt.
 
@@ -289,5 +248,5 @@ Alle drei Provider heilen jetzt zuverlässig alle 6 Szenarien, auch ohne Benchma
 | Streaming | Aktuell kein Streaming (kein `message/stream`) — reicht für synchrone Heal-Calls |
 | Auth | Kein API-Key-Schutz auf dem A2A-Endpoint — für Unternehmenseinsatz erforderlich |
 | Discovery | Agent Card URL ist `server.port`-basiert — bei Reverse-Proxy anpassen |
-| BottomSheet-Failure | ~~Offener Punkt~~ Behoben: alle drei Provider heilen 6/6 nach Retry-Bugfixes (siehe 5.4) |
-| Lokale Provider | Benchmark gegen Qwen3-30B, Devstral, Qwen3-Next erfordert laufenden LM Studio-Server auf Port 1234 |
+| BottomSheet-Failure | ~~Offener Punkt~~ Behoben: alle drei Provider heilen 6/6 nach Retry-Bugfixes (siehe 5.1) |
+| Lokale Provider | Benchmark gegen Qwen3-30B, Devstral, GLM-4.7-Flash erfordert laufenden LM Studio-Server auf Port 1234 |
