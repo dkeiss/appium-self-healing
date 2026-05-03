@@ -209,6 +209,27 @@ Suffixe auf deterministisches Rauschen ohne alphabetische Sortier-Beziehung umbe
 - **Vision macht für gpt-5.4-mini *keinen* Unterschied** — Screenshot wurde aktiv angehängt (3 × 140 KB), aber das Modell hat die visuelle Information für die Disambiguierung schlichtweg nicht genutzt. Vision-Mehrwert hängt also nicht nur an der Modellfähigkeit „kann Bilder interpretieren", sondern an „nutzt das Bild für die konkrete Locator-Entscheidung".
 - Devstral verhält sich über alle vier Iterationen identisch (1/3, immer `accessibilityId: Aktion` → instance(0)) — die Suffix-Form und Quellcode-Reihenfolge sind für sein Verhalten irrelevant; die XML-Knoten-Kollision ist die ganze Geschichte.
 
+### Iteration 5 — Implementierungs-Korrektur am Prompt (Locator-Kollision + bedingte Vision-Anweisung)
+
+Der ursprüngliche System-Prompt steuerte Modelle aktiv in die Toolbar-Falle: er empfahl `AppiumBy.accessibilityId(contentDesc)` als #1 Strategie, ohne auf Eindeutigkeit zu prüfen. Bei drei v2-Buttons mit identischem `content-desc="Aktion"` befolgten alle nicht-Sonnet-Modelle die Anweisung wörtlich → trafen immer instance(0) = Filter.
+
+Lösung: Page-Source wird **programmatisch** auf duplizierte `resource-id`- und `content-desc`-Werte gescannt ([LocatorPromptCreator.detectCollisions](self-healing-core/src/main/java/de/keiss/selfhealing/core/prompt/LocatorPromptCreator.java)). Nur wenn echte Kollisionen vorliegen, wird im User-Prompt ein „## Locator Collision Warning"-Abschnitt eingespielt mit der Liste der mehrfach vorkommenden Werte und der Anweisung, `androidUIAutomator` mit `.instance(N)` zu nutzen. Im Vision-Modus wird der Screenshot-Block in zwei Varianten erzeugt: bei Kollision direktiv („disambiguate via the screenshot"), ohne Kollision passiv („secondary signal"). Damit bleiben einfache ID-Renames vom System-Prompt unangetastet.
+
+| Profil | Tests | Toolbar-Heals | Wahl | Δ vs. Vor-Fix |
+|---|---|---|---|---|
+| `anthropic` (Sonnet 4.6, text-only) | **9/9** | 3/3 ✓ instance(0)/(1)/(2) | unverändert | keine Regression |
+| `openai` (gpt-5.4-mini, text-only) | **8/9** | **2/3** (m3n→1 ✗, x7q→1 ✓, p2k→2 ✓) | nutzt jetzt `androidUIAutomator.instance(N)` statt `accessibilityId: Aktion` | +1 Treffer |
+| `openai-vision` (gpt-5.4-mini + Bild) | 7/9 | 1/3 (alle → instance(2)) | nutzt zwar `androidUIAutomator`, aber kollabiert auf einen statischen Index | unverändert (Vision hilft weiterhin nicht) |
+
+**Befund:**
+- **Prompt-Rewrite hat eindeutig Wirkung.** gpt-5.4-mini text-only verbessert sich von 1/3 auf 2/3 — das Modell nutzt jetzt die richtige Locator-Strategie (`androidUIAutomator.instance(N)`) statt blind den Default-Match-First. Die verbleibende Lücke (m3n→1 statt 0) ist nur noch ein Index-Rateproblem, keine Strategie-Lücke mehr.
+- **Vision macht es bei gpt-5.4-mini eher schlechter** (1/3 vs. 2/3 text-only). Der Screenshot wird angehängt (13× im Lauf, je 140 KB), aber der Index-Wahl-Mechanismus konvergiert auf instance(2) für alle drei Buttons. Erklärung wahrscheinlich: Spring AI 2.0.0-M4 setzt `image_url.detail` nicht (Default = `auto`, faktisch `low` bei großen Screenshots), sodass die drei kleinen Toolbar-Icons im Downsampling effektiv zu einer Position verschmelzen. Das Modell sieht also „etwas Toolbar-artiges, etwa rechts oben" — und greift heuristisch auf den letzten der drei Indizes.
+- **Sonnet bleibt 3/3 ohne Vision** — sein Reasoning braucht weder den expliziten Kollisions-Hinweis noch das Bild.
+
+### Restimplementierungs-Lücken
+1. **Spring AI exponiert `image_url.detail` nicht** ([OpenAiChatModel.mapToMediaContent](https://github.com/spring-projects/spring-ai/blob/v2.0.0-M4/openai/src/main/java/org/springframework/ai/openai/OpenAiChatModel.java) hardcoded `ImageUrl(url)` ohne Detail). Um `detail: "high"` zu setzen, müsste die `OpenAiChatModel`-Klasse subclassed oder die ChatClient-Abstraktion umgangen werden. Erwartung: damit würde Vision auf gpt-5.4-mini ähnlich anschlagen wie auf Sonnet.
+2. **Index-Rate-Heuristik ohne Vision** — bei genuinen Locator-Kollisionen ohne Bild ist der `instance(N)`-Treffer für schwächere Modelle weiterhin Glückssache. Hier hilft nur Vision (mit hoher Auflösung) oder ein zusätzlicher Layout-Hint (z. B. `bounds`-Koordinaten der duplizierten Knoten) im Prompt.
+
 ### Hypothese-Status (nach Iteration 4 inkl. Cloud-Vergleich)
 
 Die Vision-Hypothese hält für **Sonnet 4.6** auf dieser Strecke **nicht** — empirisch robust 3/3 über alle vier Härtungs-Iterationen, Mechanismus unklar (vermutlich Reasoning oder Training-Prior). Sie hält **klar** für **alle anderen getesteten Provider** (GPT-4.1, Mistral Codestral, Devstral lokal): jeder kollabiert auf 0–1 von 3 Toolbar-Heals, mit deterministischen Failure-Patterns auf der `toolbar_status`-Assertion. Damit ist der Track der erste **echte Diskriminator** im Benchmark-Setup — alle anderen Tracks waren über sämtliche Provider 6/6.

@@ -2,6 +2,11 @@ package de.keiss.selfhealing.core.prompt;
 
 import de.keiss.selfhealing.core.model.FailureContext;
 
+import java.util.LinkedHashMap;
+import java.util.Map;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+
 /**
  * Creates optimized prompts for Appium mobile locator healing. Includes Appium-specific guidance for XML page source
  * analysis.
@@ -71,6 +76,17 @@ public class LocatorPromptCreator {
                 FloatingActionButton (`fab_*`) or IconButton instead. Always verify `clickable="true"`.
                 Never select static text or labels as button replacements.
 
+                ## Locator Collision (only relevant when the user prompt flags it)
+                If the user message contains a "## Locator Collision Warning" section, the candidate
+                resource-id or content-desc you would normally pick appears on **more than one** XML node.
+                In that case `By.id(...)` and `AppiumBy.accessibilityId(...)` will silently match the first
+                node — almost always wrong. Use `AppiumBy.androidUIAutomator` with
+                `new UiSelector().resourceId("...").instance(N)` (or `.description("...").instance(N)`) and
+                choose `N` so it points at the node matching the test's intent.
+                - If a screenshot is attached, read the icon glyph / label / position to choose `N`.
+                - Otherwise, infer `N` from the layout (toolbar actions are typically leftmost-first).
+                When no warning is present, the page source is unambiguous — keep the standard priority.
+
                 ## Output Format — JSON only, no markdown fences
                 {
                   "locatorMethod": "id | xpath | accessibilityId | androidUIAutomator",
@@ -85,7 +101,8 @@ public class LocatorPromptCreator {
                 - If using `By.id()`, use **only the short resource-id** as it appears in the XML `resource-id` attribute.
                   For Jetpack Compose apps, resource-ids are the `testTag` value without any package prefix
                   (e.g., `fab_search`, NOT `de.keiss.selfhealing.app:id/fab_search`).
-                - If the element has a `content-desc`, **always prefer accessibilityId** over id.
+                - If the element has a `content-desc`, **always prefer accessibilityId** over id — unless the
+                  Locator Collision section above flags non-uniqueness.
                 - Never invent locator values — only use attributes visible in the page source.
                 """;
     }
@@ -97,13 +114,25 @@ public class LocatorPromptCreator {
     public String createUserPrompt(FailureContext context, boolean withVision) {
         var sb = new StringBuilder();
 
+        // Detect duplicate resource-ids / content-descs once, and only emit the warning + vision
+        // disambiguation guidance when the page source actually has collisions. This keeps
+        // unambiguous heals (the typical case) on the original priority list and avoids
+        // confusing the model into second-guessing simple ID renames.
+        Collisions collisions = detectCollisions(context.pageSourceXml());
+        boolean hasCollisions = collisions != null && collisions.hasAny();
+
         if (withVision) {
             sb.append("## Screenshot\n");
-            sb.append("A PNG screenshot of the current screen is attached to this message.\n");
-            sb.append("Use it to visually identify the element the broken locator was targeting:\n");
-            sb.append("- Match labels, icons, and layout positions to entries in the XML page source below.\n");
-            sb.append("- The element's on-screen text or icon often disambiguates between multiple\n");
-            sb.append("  candidate resource-ids in the XML.\n\n");
+            if (hasCollisions) {
+                sb.append("A PNG screenshot of the current screen is attached. The XML page source contains\n");
+                sb.append("**ambiguous nodes** (see Locator Collision Warning below). Use the screenshot to\n");
+                sb.append("disambiguate: identify the test's target element visually (icon glyph / label /\n");
+                sb.append("position), then map it to the matching `instance(N)` in the XML.\n\n");
+            } else {
+                sb.append("A PNG screenshot of the current screen is attached as a secondary signal. The\n");
+                sb.append("XML page source is unambiguous for this heal, so a standard id- or\n");
+                sb.append("accessibilityId-based locator is fine; the screenshot is just for sanity-checking.\n\n");
+            }
         }
 
         sb.append("## Exception\n");
@@ -126,6 +155,26 @@ public class LocatorPromptCreator {
         if (context.pageSourceXml() != null) {
             sb.append("## Current Page Source (Appium XML)\n```xml\n");
             sb.append(smartTruncateXml(context.pageSourceXml(), this.maxPageSourceChars)).append(CODE_FENCE_END);
+        }
+
+        if (hasCollisions) {
+            sb.append("## Locator Collision Warning\n");
+            sb.append("The following attribute values appear on **multiple** XML nodes — `By.id(...)` or\n");
+            sb.append("`AppiumBy.accessibilityId(...)` will silently match only the first one. For any of\n");
+            sb.append("these, return `androidUIAutomator` with `.instance(N)` instead, choosing `N` from the\n");
+            sb.append("layout / screenshot per the system-prompt rule.\n\n");
+            if (!collisions.duplicateResourceIds.isEmpty()) {
+                sb.append("Duplicate `resource-id` values:\n");
+                collisions.duplicateResourceIds.forEach((value, count) -> sb.append("- `").append(value)
+                        .append("` — appears on ").append(count).append(" nodes\n"));
+                sb.append('\n');
+            }
+            if (!collisions.duplicateContentDescs.isEmpty()) {
+                sb.append("Duplicate `content-desc` values:\n");
+                collisions.duplicateContentDescs.forEach((value, count) -> sb.append("- `").append(value)
+                        .append("` — appears on ").append(count).append(" nodes\n"));
+                sb.append('\n');
+            }
         }
 
         sb.append("## Page Object Class: ").append(context.pageObjectClassName()).append("\n```java\n");
@@ -167,5 +216,49 @@ public class LocatorPromptCreator {
             return "";
         int idx = text.indexOf('\n');
         return idx > 0 ? text.substring(0, idx) : text;
+    }
+
+    private static final Pattern RESOURCE_ID_PATTERN = Pattern.compile("resource-id=\"([^\"]+)\"");
+    private static final Pattern CONTENT_DESC_PATTERN = Pattern.compile("content-desc=\"([^\"]+)\"");
+
+    /**
+     * Scans the Appium XML page source for `resource-id` and `content-desc` values that appear on more than one node.
+     * Empty values are ignored — Appium emits empty content-desc for many nodes, which is not a real collision.
+     */
+    Collisions detectCollisions(String xml) {
+        if (xml == null || xml.isBlank())
+            return null;
+        Map<String, Integer> resourceIdCounts = countMatches(xml, RESOURCE_ID_PATTERN);
+        Map<String, Integer> contentDescCounts = countMatches(xml, CONTENT_DESC_PATTERN);
+        Map<String, Integer> duplicateResourceIds = filterDuplicates(resourceIdCounts);
+        Map<String, Integer> duplicateContentDescs = filterDuplicates(contentDescCounts);
+        return new Collisions(duplicateResourceIds, duplicateContentDescs);
+    }
+
+    private Map<String, Integer> countMatches(String xml, Pattern pattern) {
+        Map<String, Integer> counts = new LinkedHashMap<>();
+        Matcher matcher = pattern.matcher(xml);
+        while (matcher.find()) {
+            String value = matcher.group(1);
+            if (value == null || value.isEmpty())
+                continue;
+            counts.merge(value, 1, Integer::sum);
+        }
+        return counts;
+    }
+
+    private Map<String, Integer> filterDuplicates(Map<String, Integer> counts) {
+        Map<String, Integer> duplicates = new LinkedHashMap<>();
+        counts.forEach((value, count) -> {
+            if (count > 1)
+                duplicates.put(value, count);
+        });
+        return duplicates;
+    }
+
+    record Collisions(Map<String, Integer> duplicateResourceIds, Map<String, Integer> duplicateContentDescs) {
+        boolean hasAny() {
+            return !duplicateResourceIds.isEmpty() || !duplicateContentDescs.isEmpty();
+        }
     }
 }
