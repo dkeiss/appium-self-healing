@@ -195,24 +195,36 @@ Suffixe auf deterministisches Rauschen ohne alphabetische Sortier-Beziehung umbe
 
 | Profil | Tests | Toolbar-Heals | Gewählte Locatoren | ∅ Heal-Latenz | Gesamtdauer |
 |---|---|---|---|---|---|
-| `anthropic` (Text-only) | **9/9** | 3/3 Attempt 1 | `instance(0)` / `instance(1)` / `instance(2)` ✓ | 15.3 s | 14 min 11 s |
-| `local-devstral` (Text-only) | **7/9** | 1/3 — m3n korrekt, x7q+p2k falsch | alle drei → `accessibilityId: Aktion` ⇒ instance(0) | 133.7 s | 37 min 4 s |
+| `anthropic` (Sonnet 4.6, text-only) | **9/9** | **3/3 Attempt 1** ✓ | `instance(0)` / `instance(1)` / `instance(2)` | 15.3 s | 14 min 11 s |
+| `openai` (GPT-4.1) | **6/9** | **0/3** ✗ | `instance(1)` (m3n) / `By.id: toolbar_action` (x7q) / `accessibilityId: Aktion` (p2k) | 9.5 s | 12 min 35 s |
+| `mistral` (codestral-latest) | **7/9** | 1/3 — m3n zufällig korrekt, x7q+p2k falsch | alle drei → `By.id: toolbar_action` ⇒ instance(0) | 6.0 s | 11 min 40 s |
+| `local-devstral` (text-only) | **7/9** | 1/3 — m3n zufällig korrekt, x7q+p2k falsch | alle drei → `accessibilityId: Aktion` ⇒ instance(0) | 133.7 s | 37 min 4 s |
 
-**Befund: Hypothese widerlegt.** Sonnet trifft auch nach Permutation der Page-Object-Deklarations-Reihenfolge weiterhin die korrekte Position-Zuordnung (m3n→0, x7q→1, p2k→2). Damit ist die Source-Code-Order **nicht** der Anker. Plausibler ist nun, dass Sonnet entweder über Reasoning aus dem broken-Locator-Suffix in Kombination mit dem XML-Page-Source heraus schließt (drei identische Knoten ⇒ jede Anfrage greift auf eine andere Position) oder dass ein Trainings-Prior für solche UI-Test-Patterns aktiv wird. **Keine der hier zur Verfügung stehenden Härtungs-Hebel reicht aus, Sonnet auf dieser Strecke zu brechen.**
+**Befund:**
+- **Sonnet 4.6 ist auf dieser Strecke der Ausreißer** — 3/3 in jeder Iteration, auch nach Permutation der Page-Object-Deklarations-Reihenfolge. Source-Code-Order ist also **nicht** der Anker. Plausibel sind Reasoning aus dem broken-Locator-Suffix kombiniert mit dem XML-Page-Source oder ein Trainings-Prior für solche UI-Test-Patterns. **Keine der getesteten Härtungs-Hebel reicht aus, Sonnet auf dieser Strecke zu brechen.**
+- **GPT-4.1, Mistral Codestral, lokales Devstral** kollabieren alle: jeweils 0–1 von 3 Toolbar-Szenarien zufällig korrekt, der Rest scheitert auf der `toolbar_status`-Assertion. Das Failure-Muster variiert leicht (Codestral und Devstral wählen einen einzigen statischen Locator für alle drei Heals, GPT-4.1 produziert sogar inkonsistent gemischte Locatoren), aber das Endergebnis ist dasselbe: ohne visuellen Diskriminator landen die Heals nicht zuverlässig auf der korrekten Position.
+- Devstral verhält sich über alle vier Iterationen identisch (1/3, immer `accessibilityId: Aktion` → instance(0)) — die Suffix-Form und Quellcode-Reihenfolge sind für sein Verhalten irrelevant; die XML-Knoten-Kollision ist die ganze Geschichte.
 
-Devstral verhält sich konsistent über alle vier Iterationen: dasselbe `accessibilityId: Aktion`-Muster, dieselbe 1/3-Trefferrate (nur Position 0 = Filter wird zufällig getroffen), unabhängig von Suffix-Form oder Quellcode-Reihenfolge.
+### Hypothese-Status (nach Iteration 4 inkl. Cloud-Vergleich)
 
-### Hypothese-Status (nach Iteration 4)
+Die Vision-Hypothese hält für **Sonnet 4.6** auf dieser Strecke **nicht** — empirisch robust 3/3 über alle vier Härtungs-Iterationen, Mechanismus unklar (vermutlich Reasoning oder Training-Prior). Sie hält **klar** für **alle anderen getesteten Provider** (GPT-4.1, Mistral Codestral, Devstral lokal): jeder kollabiert auf 0–1 von 3 Toolbar-Heals, mit deterministischen Failure-Patterns auf der `toolbar_status`-Assertion. Damit ist der Track der erste **echte Diskriminator** im Benchmark-Setup — alle anderen Tracks waren über sämtliche Provider 6/6.
 
-Die Vision-Hypothese hält für **starke Cloud-Modelle** (Sonnet 4.6) gegen die aktuelle Track-Schärfe **nicht** — auch ohne semantische Hints im Locator und ohne Source-Code-Order schlägt Sonnet 3/3 durch. Mechanismus unklar, aber empirisch robust über vier Iterationen. Sie hält **uneingeschränkt** für lokale Code-Modelle ohne breite UI-Priors: Devstral disambiguiert in keiner Iteration und kollabiert immer auf instance(0).
+| Modell | Toolbar-Erfolg | Failure-Modus |
+|---|---|---|
+| Anthropic Sonnet 4.6 | 3/3 ✓ | — |
+| OpenAI GPT-4.1 | 0/3 ✗ | inkonsistente Heals (mal `instance(1)`, mal nicht-disambiguierter Default) |
+| Mistral Codestral | 1/3 ✗ | alle drei → `By.id: toolbar_action` → instance(0) |
+| Devstral (local) | 1/3 ✗ | alle drei → `accessibilityId: Aktion` → instance(0) |
 
-Damit ist der Track als **vision-affiner Lakmustest für lokale / schwächere Modelle** dokumentiert. Eine Sonnet-brechende Härtung müsste vermutlich tiefer ansetzen — z. B. v2-Layout-Position randomisieren (Buttons in zufälliger Reihenfolge rendern), sodass selbst die XML-Knoten-Reihenfolge keine deterministische Position-Zuordnung mehr erlaubt. Das ist außerhalb des Scope des aktuellen Tracks.
+Damit ist der Track als **vision-affiner Lakmustest für 3 von 4 getesteten Modellen** dokumentiert. Eine Sonnet-brechende Härtung müsste vermutlich tiefer ansetzen — z. B. v2-Layout-Position randomisieren (Buttons in zufälliger Reihenfolge rendern), sodass selbst die XML-Knoten-Reihenfolge keine deterministische Position-Zuordnung mehr erlaubt. Das ist außerhalb des Scope des aktuellen Tracks.
 
 ```bash
 # Strecke ausführen (Iterationen reproduzierbar über git checkout des jeweiligen Commits)
-./scripts/run-tests-podman.sh v2 anthropic-vision   # Sonnet mit Screenshot
-./scripts/run-tests-podman.sh v2 anthropic          # Sonnet text-only (Baseline)
-./scripts/run-tests-podman.sh v2 local-devstral     # Devstral text-only (Vision-Lücke)
+./scripts/run-tests-podman.sh v2 anthropic-vision   # Sonnet mit Screenshot (3/3)
+./scripts/run-tests-podman.sh v2 anthropic          # Sonnet text-only (3/3)
+./scripts/run-tests-podman.sh v2 openai             # GPT-4.1 (0/3 — Vision-Lücke)
+./scripts/run-tests-podman.sh v2 mistral            # Codestral (1/3 — Vision-Lücke)
+./scripts/run-tests-podman.sh v2 local-devstral     # Devstral lokal (1/3 — Vision-Lücke)
 ```
 
 ---
