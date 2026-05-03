@@ -196,13 +196,17 @@ Suffixe auf deterministisches Rauschen ohne alphabetische Sortier-Beziehung umbe
 | Profil | Tests | Toolbar-Heals | Gewählte Locatoren | ∅ Heal-Latenz | Gesamtdauer |
 |---|---|---|---|---|---|
 | `anthropic` (Sonnet 4.6, text-only) | **9/9** | **3/3 Attempt 1** ✓ | `instance(0)` / `instance(1)` / `instance(2)` | 15.3 s | 14 min 11 s |
-| `openai` (GPT-4.1) | **6/9** | **0/3** ✗ | `instance(1)` (m3n) / `By.id: toolbar_action` (x7q) / `accessibilityId: Aktion` (p2k) | 9.5 s | 12 min 35 s |
+| `openai` (gpt-5.4-mini, text-only) | **7/9** | 1/3 — m3n zufällig korrekt, x7q+p2k falsch | alle drei → `By.id: toolbar_action` ⇒ instance(0) | 5.6 s | 11 min 31 s |
+| `openai-vision` (gpt-5.4-mini + Screenshot) | **7/9** | 1/3 — m3n zufällig korrekt, x7q+p2k falsch | alle drei → `accessibilityId: Aktion` ⇒ instance(0) | 5.9 s | 11 min 21 s |
 | `mistral` (codestral-latest) | **7/9** | 1/3 — m3n zufällig korrekt, x7q+p2k falsch | alle drei → `By.id: toolbar_action` ⇒ instance(0) | 6.0 s | 11 min 40 s |
 | `local-devstral` (text-only) | **7/9** | 1/3 — m3n zufällig korrekt, x7q+p2k falsch | alle drei → `accessibilityId: Aktion` ⇒ instance(0) | 133.7 s | 37 min 4 s |
 
+> **Hinweis zu OpenAI:** Das Profil wurde im Zuge dieser Messreihe von `gpt-4.1` (veraltet, Frühjahr 2025) auf `gpt-5.4-mini` aktualisiert für einen fairen Vergleich gegen Sonnet 4.6. Das Flagship `gpt-5.5` wurde ebenfalls verprobt: text-only erreichte 2/3 korrekte Toolbar-Heals (m3n→0, x7q→1) bevor das OpenAI-Quota erschöpft war — die ersten zwei Heals waren also tatsächlich korrekt, im Gegensatz zu sowohl `gpt-4.1` als auch `gpt-5.4-mini`. Damit liegt `gpt-5.5` qualitativ zwischen Sonnet (3/3) und den schwächeren Modellen (1/3), aber zu hohem Token-Aufwand (38 min Lauf, ~3× mehr Tokens pro Heal als gpt-4.1).
+
 **Befund:**
 - **Sonnet 4.6 ist auf dieser Strecke der Ausreißer** — 3/3 in jeder Iteration, auch nach Permutation der Page-Object-Deklarations-Reihenfolge. Source-Code-Order ist also **nicht** der Anker. Plausibel sind Reasoning aus dem broken-Locator-Suffix kombiniert mit dem XML-Page-Source oder ein Trainings-Prior für solche UI-Test-Patterns. **Keine der getesteten Härtungs-Hebel reicht aus, Sonnet auf dieser Strecke zu brechen.**
-- **GPT-4.1, Mistral Codestral, lokales Devstral** kollabieren alle: jeweils 0–1 von 3 Toolbar-Szenarien zufällig korrekt, der Rest scheitert auf der `toolbar_status`-Assertion. Das Failure-Muster variiert leicht (Codestral und Devstral wählen einen einzigen statischen Locator für alle drei Heals, GPT-4.1 produziert sogar inkonsistent gemischte Locatoren), aber das Endergebnis ist dasselbe: ohne visuellen Diskriminator landen die Heals nicht zuverlässig auf der korrekten Position.
+- **gpt-5.4-mini, Mistral Codestral, lokales Devstral** kollabieren alle: jeweils 1 von 3 Toolbar-Szenarien zufällig korrekt (immer m3n, weil instance(0) = Filter), der Rest scheitert auf der `toolbar_status`-Assertion. Das Failure-Muster ist nahezu identisch über alle drei: ein einziger statischer Locator (`By.id: toolbar_action` oder `accessibilityId: Aktion`) für alle drei Heals.
+- **Vision macht für gpt-5.4-mini *keinen* Unterschied** — Screenshot wurde aktiv angehängt (3 × 140 KB), aber das Modell hat die visuelle Information für die Disambiguierung schlichtweg nicht genutzt. Vision-Mehrwert hängt also nicht nur an der Modellfähigkeit „kann Bilder interpretieren", sondern an „nutzt das Bild für die konkrete Locator-Entscheidung".
 - Devstral verhält sich über alle vier Iterationen identisch (1/3, immer `accessibilityId: Aktion` → instance(0)) — die Suffix-Form und Quellcode-Reihenfolge sind für sein Verhalten irrelevant; die XML-Knoten-Kollision ist die ganze Geschichte.
 
 ### Hypothese-Status (nach Iteration 4 inkl. Cloud-Vergleich)
@@ -211,10 +215,12 @@ Die Vision-Hypothese hält für **Sonnet 4.6** auf dieser Strecke **nicht** — 
 
 | Modell | Toolbar-Erfolg | Failure-Modus |
 |---|---|---|
-| Anthropic Sonnet 4.6 | 3/3 ✓ | — |
-| OpenAI GPT-4.1 | 0/3 ✗ | inkonsistente Heals (mal `instance(1)`, mal nicht-disambiguierter Default) |
-| Mistral Codestral | 1/3 ✗ | alle drei → `By.id: toolbar_action` → instance(0) |
-| Devstral (local) | 1/3 ✗ | alle drei → `accessibilityId: Aktion` → instance(0) |
+| Anthropic Sonnet 4.6 (text-only) | 3/3 ✓ | — |
+| Anthropic Sonnet 4.6 (vision) | 3/3 ✓ | — |
+| OpenAI gpt-5.4-mini (text-only) | 1/3 ✗ | alle drei → `By.id: toolbar_action` → instance(0) |
+| OpenAI gpt-5.4-mini (vision) | 1/3 ✗ | alle drei → `accessibilityId: Aktion` → instance(0) (Bild ignoriert) |
+| Mistral Codestral (text-only) | 1/3 ✗ | alle drei → `By.id: toolbar_action` → instance(0) |
+| Devstral (local, text-only) | 1/3 ✗ | alle drei → `accessibilityId: Aktion` → instance(0) |
 
 Damit ist der Track als **vision-affiner Lakmustest für 3 von 4 getesteten Modellen** dokumentiert. Eine Sonnet-brechende Härtung müsste vermutlich tiefer ansetzen — z. B. v2-Layout-Position randomisieren (Buttons in zufälliger Reihenfolge rendern), sodass selbst die XML-Knoten-Reihenfolge keine deterministische Position-Zuordnung mehr erlaubt. Das ist außerhalb des Scope des aktuellen Tracks.
 
@@ -222,9 +228,10 @@ Damit ist der Track als **vision-affiner Lakmustest für 3 von 4 getesteten Mode
 # Strecke ausführen (Iterationen reproduzierbar über git checkout des jeweiligen Commits)
 ./scripts/run-tests-podman.sh v2 anthropic-vision   # Sonnet mit Screenshot (3/3)
 ./scripts/run-tests-podman.sh v2 anthropic          # Sonnet text-only (3/3)
-./scripts/run-tests-podman.sh v2 openai             # GPT-4.1 (0/3 — Vision-Lücke)
-./scripts/run-tests-podman.sh v2 mistral            # Codestral (1/3 — Vision-Lücke)
-./scripts/run-tests-podman.sh v2 local-devstral     # Devstral lokal (1/3 — Vision-Lücke)
+./scripts/run-tests-podman.sh v2 openai-vision      # gpt-5.4-mini mit Screenshot (1/3 — Bild ignoriert)
+./scripts/run-tests-podman.sh v2 openai             # gpt-5.4-mini text-only (1/3)
+./scripts/run-tests-podman.sh v2 mistral            # Codestral (1/3)
+./scripts/run-tests-podman.sh v2 local-devstral     # Devstral lokal (1/3)
 ```
 
 ---

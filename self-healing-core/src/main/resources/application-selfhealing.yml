@@ -114,9 +114,33 @@ spring:
       api-key: ${OPENAI_API_KEY:}
       chat:
         options:
-          model: gpt-4.1
-          temperature: 0.1
-          max-tokens: 4096
+          model: gpt-5.4-mini
+          # GPT-5 quirks vs. earlier OpenAI models:
+          # - `temperature` is locked to the API default (1); any other value is rejected.
+          # - `max_tokens` is replaced by `max_completion_tokens` (covers visible + reasoning tokens).
+          max-completion-tokens: 4096
+
+---
+# Vision-enabled variant of the openai profile — same model (GPT-5.5 supports images),
+# but flips on the screenshot attachment in the heal prompt. Activate via:
+#   SPRING_PROFILES_ACTIVE=openai-vision,selfhealing
+spring:
+  config:
+    activate:
+      on-profile: openai-vision
+  ai:
+    model:
+      chat: openai
+    openai:
+      api-key: ${OPENAI_API_KEY:}
+      chat:
+        options:
+          model: gpt-5.4-mini
+          max-completion-tokens: 4096
+
+self-healing:
+  vision:
+    enabled: true
 
 ---
 spring:

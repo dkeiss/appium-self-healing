@@ -296,7 +296,7 @@ flowchart TD
 | Provider | Profil | Modell | Einsatz |
 |----------|--------|--------|---------|
 | Anthropic | `anthropic` (`anthropic-vision`) | `claude-sonnet-4-6` | Standard (bestes Codeverständnis), Vision-fähig |
-| OpenAI | `openai` | `gpt-4.1` | Alternative |
+| OpenAI | `openai` (`openai-vision`) | `gpt-5.4-mini` | Alternative, Vision-fähig |
 | Mistral | `mistral` | `codestral-latest` | Code-spezialisiert |
 | Lokal generisch | `local` | LM Studio (`LM_STUDIO_MODEL`) | Offline, kostenfrei |
 | Lokal vorkonfiguriert | `local-qwen3-30b`, `local-devstral`, `local-qwen3-next`, `local-glm-4-7-flash` | siehe [LM-Studio-Tabelle](#lokale-llms-mit-lm-studio) | Offline, mit Modell-spezifischen Tunings |
