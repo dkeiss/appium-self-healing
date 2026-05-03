@@ -189,14 +189,27 @@ Suffixe auf deterministisches Rauschen ohne alphabetische Sortier-Beziehung umbe
 - **Sonnet bleibt 3/3.** Suffixe `m3n` / `x7q` / `p2k` haben keine alphabetische Position-Beziehung mehr (alphabetisch wäre `m3n < p2k < x7q`, layout-Position ist `m3n=0, x7q=1, p2k=2`). Dass Sonnet trotzdem korrekt mappt, deutet auf einen weiteren Leak: die **Deklarations-Reihenfolge der `BTN_*`-Konstanten in `ResultPage.java`** — der `SourceCodeResolver` lädt das Page-Object beim Heal mit, das Modell sieht die Liste in Layout-Reihenfolge und mappt declaration-index → instance-index. Um Sonnet auf dieser Strecke zu brechen, müsste man die Deklarations-Reihenfolge im Page-Object ebenfalls schütteln (z. B. p2k, m3n, x7q deklarieren) oder die v2-Layout-Reihenfolge gegenüber v1 randomisieren.
 - **Devstral kollabiert wieder auf 1/3.** Identisches Muster wie Iteration 2: alle drei broken-Locators mappen auf `accessibilityId: Aktion`, was deterministisch instance(0) = Filter trifft. m3n passt zufällig, x7q (erwartet "sortiert") und p2k (erwartet "geteilt") scheitern auf der `toolbar_status`-Assertion. Devstral ist gegen Locator-Kollisionen wehrlos — egal wie der Suffix heißt.
 
-### Hypothese-Status (final)
+### Iteration 4 — permutierte Page-Object-Deklaration (`p2k, m3n, x7q`)
 
-Die Vision-Hypothese hält **nicht** für starke Cloud-Modelle (Sonnet 4.6) gegen die hier gebauten Track-Härtungsstufen — alphabetischer Suffix, semantischer Suffix und unalphabetisches Rauschen schlagen alle 3/3 durch, weil das Modell genug Hilfssignale (Variablenname, alphabetische Ordnung, Source-Code-Deklarations-Reihenfolge) findet. Sie hält **uneingeschränkt** für lokale Code-Modelle ohne breite UI-Priors: Devstral kann die drei identischen XML-Knoten in keiner Konfiguration disambiguieren — egal ob die Suffixe semantisch (`filter/sort/share`), alphabetisch (`a/b/c`) oder Rauschen (`m3n/x7q/p2k`) sind, der Heal kollabiert immer auf dieselbe `accessibilityId: Aktion` und damit auf instance(0).
+`BTN_*`-Konstanten und `tap*()`-Methoden in [ResultPage.java](integration-tests/src/test/java/de/keiss/selfhealing/tests/pages/ResultPage.java) gegen die v2-Layout-Position permutiert: Deklarations-Reihenfolge `p2k → m3n → x7q`, aber gebundene Layout-Positionen weiterhin `m3n=0, x7q=1, p2k=2`. Damit ist der vermutete Source-Code-Order-Leak geschlossen.
 
-Damit ist der Track als **vision-affiner Lakmustest für lokale/schwächere Modelle** dokumentiert. Wer Sonnet ebenfalls brechen will, müsste den Source-Code-Leak schließen (z. B. `BTN_*`-Deklarations-Reihenfolge in `ResultPage.java` gegen die v2-Layout-Position permutieren).
+| Profil | Tests | Toolbar-Heals | Gewählte Locatoren | ∅ Heal-Latenz | Gesamtdauer |
+|---|---|---|---|---|---|
+| `anthropic` (Text-only) | **9/9** | 3/3 Attempt 1 | `instance(0)` / `instance(1)` / `instance(2)` ✓ | 15.3 s | 14 min 11 s |
+| `local-devstral` (Text-only) | **7/9** | 1/3 — m3n korrekt, x7q+p2k falsch | alle drei → `accessibilityId: Aktion` ⇒ instance(0) | 133.7 s | 37 min 4 s |
+
+**Befund: Hypothese widerlegt.** Sonnet trifft auch nach Permutation der Page-Object-Deklarations-Reihenfolge weiterhin die korrekte Position-Zuordnung (m3n→0, x7q→1, p2k→2). Damit ist die Source-Code-Order **nicht** der Anker. Plausibler ist nun, dass Sonnet entweder über Reasoning aus dem broken-Locator-Suffix in Kombination mit dem XML-Page-Source heraus schließt (drei identische Knoten ⇒ jede Anfrage greift auf eine andere Position) oder dass ein Trainings-Prior für solche UI-Test-Patterns aktiv wird. **Keine der hier zur Verfügung stehenden Härtungs-Hebel reicht aus, Sonnet auf dieser Strecke zu brechen.**
+
+Devstral verhält sich konsistent über alle vier Iterationen: dasselbe `accessibilityId: Aktion`-Muster, dieselbe 1/3-Trefferrate (nur Position 0 = Filter wird zufällig getroffen), unabhängig von Suffix-Form oder Quellcode-Reihenfolge.
+
+### Hypothese-Status (nach Iteration 4)
+
+Die Vision-Hypothese hält für **starke Cloud-Modelle** (Sonnet 4.6) gegen die aktuelle Track-Schärfe **nicht** — auch ohne semantische Hints im Locator und ohne Source-Code-Order schlägt Sonnet 3/3 durch. Mechanismus unklar, aber empirisch robust über vier Iterationen. Sie hält **uneingeschränkt** für lokale Code-Modelle ohne breite UI-Priors: Devstral disambiguiert in keiner Iteration und kollabiert immer auf instance(0).
+
+Damit ist der Track als **vision-affiner Lakmustest für lokale / schwächere Modelle** dokumentiert. Eine Sonnet-brechende Härtung müsste vermutlich tiefer ansetzen — z. B. v2-Layout-Position randomisieren (Buttons in zufälliger Reihenfolge rendern), sodass selbst die XML-Knoten-Reihenfolge keine deterministische Position-Zuordnung mehr erlaubt. Das ist außerhalb des Scope des aktuellen Tracks.
 
 ```bash
-# Strecke ausführen (alle drei Iterationen reproduzierbar über git checkout des Iteration-Commits)
+# Strecke ausführen (Iterationen reproduzierbar über git checkout des jeweiligen Commits)
 ./scripts/run-tests-podman.sh v2 anthropic-vision   # Sonnet mit Screenshot
 ./scripts/run-tests-podman.sh v2 anthropic          # Sonnet text-only (Baseline)
 ./scripts/run-tests-podman.sh v2 local-devstral     # Devstral text-only (Vision-Lücke)
