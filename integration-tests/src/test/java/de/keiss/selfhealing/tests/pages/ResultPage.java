@@ -30,6 +30,17 @@ public class ResultPage {
     private static final By ITEM_PRICE = By.id("text_price");
     private static final By NO_RESULTS_MESSAGE = By.id("text_no_results");
 
+    // v1 toolbar locators — noise-suffixed names with no alphabetic-to-position relation,
+    // AND declaration order intentionally permuted against the v2 layout-position mapping
+    // (layout: m3n=0, x7q=1, p2k=2; declaration: p2k, m3n, x7q). This closes the
+    // source-code-order leak: a heal-time LLM inspecting this file cannot infer
+    // declaration-position == layout-position. In v2 these all collapse to three identical
+    // "toolbar_action" nodes, distinguishable only by the rendered icon.
+    private static final By BTN_P2K = By.id("btn_p2k");
+    private static final By BTN_M3N = By.id("btn_m3n");
+    private static final By BTN_X7Q = By.id("btn_x7q");
+    private static final By TOOLBAR_STATUS = By.id("toolbar_status");
+
     private final SelfHealingAppiumDriver driver;
 
     public int getConnectionCount() {
@@ -54,5 +65,23 @@ public class ResultPage {
 
     public String getNoResultsMessage() {
         return driver.findElement(NO_RESULTS_MESSAGE).getText();
+    }
+
+    // Method order mirrors the permuted declaration order above (p2k, m3n, x7q) — the
+    // file should not contain a single hint that maps suffix → layout position.
+    public void tapP2k() {
+        driver.findElement(BTN_P2K).click();
+    }
+
+    public void tapM3n() {
+        driver.findElement(BTN_M3N).click();
+    }
+
+    public void tapX7q() {
+        driver.findElement(BTN_X7Q).click();
+    }
+
+    public String getToolbarStatus() {
+        return driver.findElement(TOOLBAR_STATUS).getText();
     }
 }

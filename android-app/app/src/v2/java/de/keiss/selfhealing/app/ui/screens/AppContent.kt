@@ -42,7 +42,11 @@ fun AppContent(viewModel: SearchViewModel) {
                 connections = uiState.connections,
                 isLoading = uiState.isLoading,
                 error = uiState.error,
-                onBack = { navController.popBackStack() }
+                onBack = { navController.popBackStack() },
+                toolbarStatus = uiState.toolbarStatus,
+                onFilter = viewModel::applyFilter,
+                onSort = viewModel::applySort,
+                onShare = viewModel::shareResults
             )
         }
     }

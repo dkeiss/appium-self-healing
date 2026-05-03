@@ -22,6 +22,10 @@ fun AppContent(viewModel: SearchViewModel) {
         connections = uiState.connections,
         isLoading = uiState.isLoading,
         error = uiState.error,
-        hasSearched = uiState.hasSearched
+        hasSearched = uiState.hasSearched,
+        toolbarStatus = uiState.toolbarStatus,
+        onFilter = viewModel::applyFilter,
+        onSort = viewModel::applySort,
+        onShare = viewModel::shareResults
     )
 }

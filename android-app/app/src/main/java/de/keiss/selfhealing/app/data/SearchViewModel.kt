@@ -13,7 +13,8 @@ data class SearchUiState(
     val connections: List<Connection> = emptyList(),
     val isLoading: Boolean = false,
     val error: String? = null,
-    val hasSearched: Boolean = false
+    val hasSearched: Boolean = false,
+    val toolbarStatus: String = ""
 )
 
 class SearchViewModel : ViewModel() {
@@ -34,7 +35,7 @@ class SearchViewModel : ViewModel() {
         if (state.from.isBlank() || state.to.isBlank()) return
 
         viewModelScope.launch {
-            _uiState.value = state.copy(isLoading = true, error = null)
+            _uiState.value = state.copy(isLoading = true, error = null, toolbarStatus = "")
 
             ConnectionRepository.search(state.from, state.to)
                 .onSuccess { connections ->
@@ -52,5 +53,17 @@ class SearchViewModel : ViewModel() {
                     )
                 }
         }
+    }
+
+    fun applyFilter() {
+        _uiState.value = _uiState.value.copy(toolbarStatus = "Verbindungen gefiltert")
+    }
+
+    fun applySort() {
+        _uiState.value = _uiState.value.copy(toolbarStatus = "Verbindungen sortiert")
+    }
+
+    fun shareResults() {
+        _uiState.value = _uiState.value.copy(toolbarStatus = "Verbindungen geteilt")
     }
 }

@@ -97,6 +97,12 @@ v1 ist eine Einzelseiten-App mit Standard-IDs; v2 hat einen separaten Ergebnis-S
 | Keine Ergebnisse | `text_no_results` | `empty_state_text` | ID + separate Seite | Schwer |
 | Tauschen-Button | — | `btn_swap` | Neu in v2 | — |
 | Detail-Sheet | — | `detail_sheet` | Neu in v2 | — |
+| Filter-Action (Position 0) | `btn_m3n` (TextButton) | `toolbar_action` (IconButton, Trichter-Icon) | ID + Widget-Typ + ID-Kollision | **Vision-affin** |
+| Sort-Action (Position 1) | `btn_x7q` (TextButton) | `toolbar_action` (IconButton, Sortier-Icon) | ID + Widget-Typ + ID-Kollision | **Vision-affin** |
+| Share-Action (Position 2) | `btn_p2k` (TextButton) | `toolbar_action` (IconButton, Share-Icon) | ID + Widget-Typ + ID-Kollision | **Vision-affin** |
+| Toolbar-Status | `toolbar_status` | `toolbar_status` | unverändert (Verifikations-Anker) | — |
+
+> **Vision-affine Locator-Kollision:** Die drei Toolbar-Aktionen in v2 teilen sich denselben `testTag` (`toolbar_action`) und dieselbe `content-description` (`Aktion`). Im XML-Page-Source sind sie ununterscheidbar — der einzige Diskriminator ist das gerenderte Icon-Glyph (Trichter / Sortier-Pfeile / Share-Symbol). Die v1-Locatoren heißen bewusst `btn_m3n` / `btn_x7q` / `btn_p2k` (semantisch entkoppelt **und** unalphabetisch), damit der broken-Locator-Name dem LLM weder Zweck noch Position über die Suffix-Sortierung verrät. Verifikation läuft über den `toolbar_status`-Text, der nach erfolgreichem Klick zeigt, welche Aktion tatsächlich ausgelöst wurde — ein falscher Heal schlägt damit auf der Assertion fehl, nicht erst bei `NoSuchElementException`.
 
 ---
 
@@ -290,7 +296,7 @@ flowchart TD
 | Provider | Profil | Modell | Einsatz |
 |----------|--------|--------|---------|
 | Anthropic | `anthropic` (`anthropic-vision`) | `claude-sonnet-4-6` | Standard (bestes Codeverständnis), Vision-fähig |
-| OpenAI | `openai` | `gpt-4.1` | Alternative |
+| OpenAI | `openai` (`openai-vision`) | `gpt-5.4-mini` | Alternative, Vision-fähig |
 | Mistral | `mistral` | `codestral-latest` | Code-spezialisiert |
 | Lokal generisch | `local` | LM Studio (`LM_STUDIO_MODEL`) | Offline, kostenfrei |
 | Lokal vorkonfiguriert | `local-qwen3-30b`, `local-devstral`, `local-qwen3-next`, `local-glm-4-7-flash` | siehe [LM-Studio-Tabelle](#lokale-llms-mit-lm-studio) | Offline, mit Modell-spezifischen Tunings |

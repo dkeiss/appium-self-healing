@@ -13,6 +13,7 @@
   - [GLM-4.7-Flash](#glm-47-flash)
 - [LLM-Vergleich (Cloud + lokal)](#llm-vergleich-cloud--lokal)
 - [Cache-Bypass für LLM-Benchmarks](#cache-bypass-für-llm-benchmarks)
+- [Vision-affiner Toolbar-Track](#vision-affiner-toolbar-track)
 - [verify-fix.sh Validierung](#verify-fixsh-validierung)
 
 ---
@@ -137,6 +138,122 @@ self-healing:
 ## Cache-Bypass für LLM-Benchmarks
 
 Per ENV `SELF_HEALING_CACHE_ENABLED=false` lässt sich der `PromptCache` deaktivieren — nützlich für faire Einzel-Locator-Benchmarks, bei denen ein falscher Heal in Szenario 1 nicht via Cache in Folge-Szenarien propagieren soll. Default bleibt `true`.
+
+---
+
+## Vision-affiner Toolbar-Track
+
+Mit dem Feature [toolbar_actions.feature](integration-tests/src/test/resources/features/toolbar_actions.feature) (Tag `@toolbar`) gibt es eine eigene Strecke, die XML-only-Heal eigentlich aushebeln soll: Die drei Toolbar-Aktionen (Filtern / Sortieren / Teilen) teilen sich in v2 denselben `testTag` (`toolbar_action`) und dieselbe `content-description` (`Aktion`). Nur das gerenderte Icon-Glyph unterscheidet sie. Verifikation läuft über `toolbar_status` — ein falscher Heal kippt auf der Assertion, nicht auf `NoSuchElementException`.
+
+### Iteration 1 — semantische Locator-Namen (`btn_filter`/`btn_sort`/`btn_share`)
+
+| Profil | Tests | Toolbar-Heals | Gewählte Locatoren | ∅ Heal-Latenz | Gesamtdauer |
+|---|---|---|---|---|---|
+| `anthropic-vision` (Vision) | **9/9** | 3/3 Attempt 1 | `instance(0)` / `instance(1)` / `instance(2)` ✓ | 21.4 s | 15 min 11 s |
+| `anthropic` (Text-only) | **9/9** | 3/3 Attempt 1 | `instance(0)` / `instance(1)` / `instance(2)` ✓ | 16.3 s | 13 min 48 s |
+
+**Befund:** Sonnet 4.6 trifft auch ohne Vision identisch — die Variable-Namen (`btn_filter`/`btn_sort`/`btn_share`) plus die UI-Konvention Filter→Sort→Share von links nach rechts geben einen so starken Prior, dass das Modell die Position auch ohne Bild korrekt rät. Track diskriminiert nicht.
+
+### Iteration 2 — semantisch entkoppelte aber alphabetische Locator-Namen (`btn_action_a/b/c`)
+
+Locatoren auf `btn_action_a/b/c` umbenannt, Page-Object-Methoden auf `tapActionA/B/C()`, Cucumber-Steps auf "ich auf Aktion A/B/C klicke". Sichtbare Button-Beschriftungen v1 bleiben "Filtern"/"Sortieren"/"Teilen" (für die App-UX), tragen aber keine Heal-relevante Information mehr.
+
+| Profil | Tests | Toolbar-Heals | Gewählte Locatoren | ∅ Heal-Latenz | Gesamtdauer |
+|---|---|---|---|---|---|
+| `anthropic` (Text-only) | **9/9** | 3/3 Attempt 1 | `instance(0)` / `instance(1)` / `instance(2)` ✓ | 16.1 s | 13 min 54 s |
+| `local-devstral` (Text-only) | **7/9** | 1/3 — A korrekt, **B+C falsch** | alle drei → `accessibilityId: Aktion` ⇒ immer instance(0) = Filter | 119.2 s | 35 min 21 s |
+
+**Devstral-Detail:**
+
+| Locator | Heal | Resultat | Erwarteter Status | Gemessen |
+|---|---|---|---|---|
+| `btn_action_a` | `accessibilityId: Aktion` | klickt instance(0) | "Verbindungen gefiltert" | "Verbindungen gefiltert" ✓ |
+| `btn_action_b` | `accessibilityId: Aktion` | klickt instance(0) | "Verbindungen sortiert" | "Verbindungen gefiltert" ✗ |
+| `btn_action_c` | `accessibilityId: Aktion` | klickt instance(0) | "Verbindungen geteilt" | "Verbindungen gefiltert" ✗ |
+
+**Befund:**
+- **Sonnet bleibt 3/3** — der alphabetische Suffix `_a/_b/_c` plus Layout-Reihenfolge im XML reicht ihm immer noch, um die Position korrekt zu rekonstruieren.
+- **Devstral kollabiert auf 1/3** — wählt für jede der drei broken-Locators denselben Locator (`accessibilityId: Aktion`), der den ersten der drei identischen `toolbar_action`-Knoten findet. Aktion A passiert nur zufällig, weil Position 0 = Filter. B und C scheitern auf der `toolbar_status`-Assertion. Damit ist die Vision-Lücke für lokale/schwächere Modelle dokumentiert.
+- **Vergleich mit lokalem Vision-Modell steht aus** — Devstral selbst ist text-only. Für eine echte Vision-vs-Text-Lokal-Demo müsste ein Vision-fähiges lokales Modell geladen werden (z. B. Qwen3-VL).
+
+### Iteration 3 — unalphabetisches Rauschen (`btn_m3n` / `btn_x7q` / `btn_p2k`)
+
+Suffixe auf deterministisches Rauschen ohne alphabetische Sortier-Beziehung umbenannt: `m3n` (Filter, Position 0), `x7q` (Sort, Position 1), `p2k` (Share, Position 2). Damit ist auch der `_a/_b/_c → 0/1/2`-Hint der Iteration 2 entfernt. Page-Object-Methoden / Steps / Feature ziehen mit (`tapM3n` / "ich auf den Button m3n klicke" / "Button m3n löst Filter-Verhalten aus").
+
+| Profil | Tests | Toolbar-Heals | Gewählte Locatoren | ∅ Heal-Latenz | Gesamtdauer |
+|---|---|---|---|---|---|
+| `anthropic` (Text-only) | **9/9** | 3/3 Attempt 1 | `instance(0)` / `instance(1)` / `instance(2)` ✓ | 15.5 s | 13 min 50 s |
+| `local-devstral` (Text-only) | **7/9** | 1/3 — m3n korrekt, **x7q+p2k falsch** | alle drei → `accessibilityId: Aktion` ⇒ immer instance(0) = Filter | 119.6 s | 35 min 12 s |
+
+**Befund:**
+- **Sonnet bleibt 3/3.** Suffixe `m3n` / `x7q` / `p2k` haben keine alphabetische Position-Beziehung mehr (alphabetisch wäre `m3n < p2k < x7q`, layout-Position ist `m3n=0, x7q=1, p2k=2`). Dass Sonnet trotzdem korrekt mappt, deutet auf einen weiteren Leak: die **Deklarations-Reihenfolge der `BTN_*`-Konstanten in `ResultPage.java`** — der `SourceCodeResolver` lädt das Page-Object beim Heal mit, das Modell sieht die Liste in Layout-Reihenfolge und mappt declaration-index → instance-index. Um Sonnet auf dieser Strecke zu brechen, müsste man die Deklarations-Reihenfolge im Page-Object ebenfalls schütteln (z. B. p2k, m3n, x7q deklarieren) oder die v2-Layout-Reihenfolge gegenüber v1 randomisieren.
+- **Devstral kollabiert wieder auf 1/3.** Identisches Muster wie Iteration 2: alle drei broken-Locators mappen auf `accessibilityId: Aktion`, was deterministisch instance(0) = Filter trifft. m3n passt zufällig, x7q (erwartet "sortiert") und p2k (erwartet "geteilt") scheitern auf der `toolbar_status`-Assertion. Devstral ist gegen Locator-Kollisionen wehrlos — egal wie der Suffix heißt.
+
+### Iteration 4 — permutierte Page-Object-Deklaration (`p2k, m3n, x7q`)
+
+`BTN_*`-Konstanten und `tap*()`-Methoden in [ResultPage.java](integration-tests/src/test/java/de/keiss/selfhealing/tests/pages/ResultPage.java) gegen die v2-Layout-Position permutiert: Deklarations-Reihenfolge `p2k → m3n → x7q`, aber gebundene Layout-Positionen weiterhin `m3n=0, x7q=1, p2k=2`. Damit ist der vermutete Source-Code-Order-Leak geschlossen.
+
+| Profil | Tests | Toolbar-Heals | Gewählte Locatoren | ∅ Heal-Latenz | Gesamtdauer |
+|---|---|---|---|---|---|
+| `anthropic` (Sonnet 4.6, text-only) | **9/9** | **3/3 Attempt 1** ✓ | `instance(0)` / `instance(1)` / `instance(2)` | 15.3 s | 14 min 11 s |
+| `openai` (gpt-5.4-mini, text-only) | **7/9** | 1/3 — m3n zufällig korrekt, x7q+p2k falsch | alle drei → `By.id: toolbar_action` ⇒ instance(0) | 5.6 s | 11 min 31 s |
+| `openai-vision` (gpt-5.4-mini + Screenshot) | **7/9** | 1/3 — m3n zufällig korrekt, x7q+p2k falsch | alle drei → `accessibilityId: Aktion` ⇒ instance(0) | 5.9 s | 11 min 21 s |
+| `mistral` (codestral-latest) | **7/9** | 1/3 — m3n zufällig korrekt, x7q+p2k falsch | alle drei → `By.id: toolbar_action` ⇒ instance(0) | 6.0 s | 11 min 40 s |
+| `local-devstral` (text-only) | **7/9** | 1/3 — m3n zufällig korrekt, x7q+p2k falsch | alle drei → `accessibilityId: Aktion` ⇒ instance(0) | 133.7 s | 37 min 4 s |
+
+> **Hinweis zu OpenAI:** Das Profil wurde im Zuge dieser Messreihe von `gpt-4.1` (veraltet, Frühjahr 2025) auf `gpt-5.4-mini` aktualisiert für einen fairen Vergleich gegen Sonnet 4.6. Das Flagship `gpt-5.5` wurde ebenfalls verprobt: text-only erreichte 2/3 korrekte Toolbar-Heals (m3n→0, x7q→1) bevor das OpenAI-Quota erschöpft war — die ersten zwei Heals waren also tatsächlich korrekt, im Gegensatz zu sowohl `gpt-4.1` als auch `gpt-5.4-mini`. Damit liegt `gpt-5.5` qualitativ zwischen Sonnet (3/3) und den schwächeren Modellen (1/3), aber zu hohem Token-Aufwand (38 min Lauf, ~3× mehr Tokens pro Heal als gpt-4.1).
+
+**Befund:**
+- **Sonnet 4.6 ist auf dieser Strecke der Ausreißer** — 3/3 in jeder Iteration, auch nach Permutation der Page-Object-Deklarations-Reihenfolge. Source-Code-Order ist also **nicht** der Anker. Plausibel sind Reasoning aus dem broken-Locator-Suffix kombiniert mit dem XML-Page-Source oder ein Trainings-Prior für solche UI-Test-Patterns. **Keine der getesteten Härtungs-Hebel reicht aus, Sonnet auf dieser Strecke zu brechen.**
+- **gpt-5.4-mini, Mistral Codestral, lokales Devstral** kollabieren alle: jeweils 1 von 3 Toolbar-Szenarien zufällig korrekt (immer m3n, weil instance(0) = Filter), der Rest scheitert auf der `toolbar_status`-Assertion. Das Failure-Muster ist nahezu identisch über alle drei: ein einziger statischer Locator (`By.id: toolbar_action` oder `accessibilityId: Aktion`) für alle drei Heals.
+- **Vision macht für gpt-5.4-mini *keinen* Unterschied** — Screenshot wurde aktiv angehängt (3 × 140 KB), aber das Modell hat die visuelle Information für die Disambiguierung schlichtweg nicht genutzt. Vision-Mehrwert hängt also nicht nur an der Modellfähigkeit „kann Bilder interpretieren", sondern an „nutzt das Bild für die konkrete Locator-Entscheidung".
+- Devstral verhält sich über alle vier Iterationen identisch (1/3, immer `accessibilityId: Aktion` → instance(0)) — die Suffix-Form und Quellcode-Reihenfolge sind für sein Verhalten irrelevant; die XML-Knoten-Kollision ist die ganze Geschichte.
+
+### Iteration 5 — Implementierungs-Korrektur am Prompt (Locator-Kollision + bedingte Vision-Anweisung)
+
+Der ursprüngliche System-Prompt steuerte Modelle aktiv in die Toolbar-Falle: er empfahl `AppiumBy.accessibilityId(contentDesc)` als #1 Strategie, ohne auf Eindeutigkeit zu prüfen. Bei drei v2-Buttons mit identischem `content-desc="Aktion"` befolgten alle nicht-Sonnet-Modelle die Anweisung wörtlich → trafen immer instance(0) = Filter.
+
+Lösung: Page-Source wird **programmatisch** auf duplizierte `resource-id`- und `content-desc`-Werte gescannt ([LocatorPromptCreator.detectCollisions](self-healing-core/src/main/java/de/keiss/selfhealing/core/prompt/LocatorPromptCreator.java)). Nur wenn echte Kollisionen vorliegen, wird im User-Prompt ein „## Locator Collision Warning"-Abschnitt eingespielt mit der Liste der mehrfach vorkommenden Werte und der Anweisung, `androidUIAutomator` mit `.instance(N)` zu nutzen. Im Vision-Modus wird der Screenshot-Block in zwei Varianten erzeugt: bei Kollision direktiv („disambiguate via the screenshot"), ohne Kollision passiv („secondary signal"). Damit bleiben einfache ID-Renames vom System-Prompt unangetastet.
+
+| Profil | Tests | Toolbar-Heals | Wahl | Δ vs. Vor-Fix |
+|---|---|---|---|---|
+| `anthropic` (Sonnet 4.6, text-only) | **9/9** | 3/3 ✓ instance(0)/(1)/(2) | unverändert | keine Regression |
+| `openai` (gpt-5.4-mini, text-only) | **8/9** | **2/3** (m3n→1 ✗, x7q→1 ✓, p2k→2 ✓) | nutzt jetzt `androidUIAutomator.instance(N)` statt `accessibilityId: Aktion` | +1 Treffer |
+| `openai-vision` (gpt-5.4-mini + Bild) | 7/9 | 1/3 (alle → instance(2)) | nutzt zwar `androidUIAutomator`, aber kollabiert auf einen statischen Index | unverändert (Vision hilft weiterhin nicht) |
+
+**Befund:**
+- **Prompt-Rewrite hat eindeutig Wirkung.** gpt-5.4-mini text-only verbessert sich von 1/3 auf 2/3 — das Modell nutzt jetzt die richtige Locator-Strategie (`androidUIAutomator.instance(N)`) statt blind den Default-Match-First. Die verbleibende Lücke (m3n→1 statt 0) ist nur noch ein Index-Rateproblem, keine Strategie-Lücke mehr.
+- **Vision macht es bei gpt-5.4-mini eher schlechter** (1/3 vs. 2/3 text-only). Der Screenshot wird angehängt (13× im Lauf, je 140 KB), aber der Index-Wahl-Mechanismus konvergiert auf instance(2) für alle drei Buttons. Erklärung wahrscheinlich: Spring AI 2.0.0-M4 setzt `image_url.detail` nicht (Default = `auto`, faktisch `low` bei großen Screenshots), sodass die drei kleinen Toolbar-Icons im Downsampling effektiv zu einer Position verschmelzen. Das Modell sieht also „etwas Toolbar-artiges, etwa rechts oben" — und greift heuristisch auf den letzten der drei Indizes.
+- **Sonnet bleibt 3/3 ohne Vision** — sein Reasoning braucht weder den expliziten Kollisions-Hinweis noch das Bild.
+
+### Restimplementierungs-Lücken
+1. **Spring AI exponiert `image_url.detail` nicht** ([OpenAiChatModel.mapToMediaContent](https://github.com/spring-projects/spring-ai/blob/v2.0.0-M4/openai/src/main/java/org/springframework/ai/openai/OpenAiChatModel.java) hardcoded `ImageUrl(url)` ohne Detail). Um `detail: "high"` zu setzen, müsste die `OpenAiChatModel`-Klasse subclassed oder die ChatClient-Abstraktion umgangen werden. Erwartung: damit würde Vision auf gpt-5.4-mini ähnlich anschlagen wie auf Sonnet.
+2. **Index-Rate-Heuristik ohne Vision** — bei genuinen Locator-Kollisionen ohne Bild ist der `instance(N)`-Treffer für schwächere Modelle weiterhin Glückssache. Hier hilft nur Vision (mit hoher Auflösung) oder ein zusätzlicher Layout-Hint (z. B. `bounds`-Koordinaten der duplizierten Knoten) im Prompt.
+
+### Hypothese-Status (nach Iteration 4 inkl. Cloud-Vergleich)
+
+Die Vision-Hypothese hält für **Sonnet 4.6** auf dieser Strecke **nicht** — empirisch robust 3/3 über alle vier Härtungs-Iterationen, Mechanismus unklar (vermutlich Reasoning oder Training-Prior). Sie hält **klar** für **alle anderen getesteten Provider** (GPT-4.1, Mistral Codestral, Devstral lokal): jeder kollabiert auf 0–1 von 3 Toolbar-Heals, mit deterministischen Failure-Patterns auf der `toolbar_status`-Assertion. Damit ist der Track der erste **echte Diskriminator** im Benchmark-Setup — alle anderen Tracks waren über sämtliche Provider 6/6.
+
+| Modell | Toolbar-Erfolg | Failure-Modus |
+|---|---|---|
+| Anthropic Sonnet 4.6 (text-only) | 3/3 ✓ | — |
+| Anthropic Sonnet 4.6 (vision) | 3/3 ✓ | — |
+| OpenAI gpt-5.4-mini (text-only) | 1/3 ✗ | alle drei → `By.id: toolbar_action` → instance(0) |
+| OpenAI gpt-5.4-mini (vision) | 1/3 ✗ | alle drei → `accessibilityId: Aktion` → instance(0) (Bild ignoriert) |
+| Mistral Codestral (text-only) | 1/3 ✗ | alle drei → `By.id: toolbar_action` → instance(0) |
+| Devstral (local, text-only) | 1/3 ✗ | alle drei → `accessibilityId: Aktion` → instance(0) |
+
+Damit ist der Track als **vision-affiner Lakmustest für 3 von 4 getesteten Modellen** dokumentiert. Eine Sonnet-brechende Härtung müsste vermutlich tiefer ansetzen — z. B. v2-Layout-Position randomisieren (Buttons in zufälliger Reihenfolge rendern), sodass selbst die XML-Knoten-Reihenfolge keine deterministische Position-Zuordnung mehr erlaubt. Das ist außerhalb des Scope des aktuellen Tracks.
+
+```bash
+# Strecke ausführen (Iterationen reproduzierbar über git checkout des jeweiligen Commits)
+./scripts/run-tests-podman.sh v2 anthropic-vision   # Sonnet mit Screenshot (3/3)
+./scripts/run-tests-podman.sh v2 anthropic          # Sonnet text-only (3/3)
+./scripts/run-tests-podman.sh v2 openai-vision      # gpt-5.4-mini mit Screenshot (1/3 — Bild ignoriert)
+./scripts/run-tests-podman.sh v2 openai             # gpt-5.4-mini text-only (1/3)
+./scripts/run-tests-podman.sh v2 mistral            # Codestral (1/3)
+./scripts/run-tests-podman.sh v2 local-devstral     # Devstral lokal (1/3)
+```
 
 ---
 
