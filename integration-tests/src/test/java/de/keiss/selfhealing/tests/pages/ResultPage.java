@@ -30,12 +30,12 @@ public class ResultPage {
     private static final By ITEM_PRICE = By.id("text_price");
     private static final By NO_RESULTS_MESSAGE = By.id("text_no_results");
 
-    // v1 toolbar locators — semantic-free names (a/b/c) so the broken-locator string
-    // carries no hint about which action it targets. In v2 these all collapse to three
-    // identical "toolbar_action" nodes, distinguishable only by the rendered icon.
-    private static final By BTN_ACTION_A = By.id("btn_action_a");
-    private static final By BTN_ACTION_B = By.id("btn_action_b");
-    private static final By BTN_ACTION_C = By.id("btn_action_c");
+    // v1 toolbar locators — noise-suffixed names with no alphabetic-to-position relation
+    // so the broken-locator string carries no usable hint. In v2 these all collapse to
+    // three identical "toolbar_action" nodes, distinguishable only by the rendered icon.
+    private static final By BTN_M3N = By.id("btn_m3n");
+    private static final By BTN_X7Q = By.id("btn_x7q");
+    private static final By BTN_P2K = By.id("btn_p2k");
     private static final By TOOLBAR_STATUS = By.id("toolbar_status");
 
     private final SelfHealingAppiumDriver driver;
@@ -64,16 +64,16 @@ public class ResultPage {
         return driver.findElement(NO_RESULTS_MESSAGE).getText();
     }
 
-    public void tapActionA() {
-        driver.findElement(BTN_ACTION_A).click();
+    public void tapM3n() {
+        driver.findElement(BTN_M3N).click();
     }
 
-    public void tapActionB() {
-        driver.findElement(BTN_ACTION_B).click();
+    public void tapX7q() {
+        driver.findElement(BTN_X7Q).click();
     }
 
-    public void tapActionC() {
-        driver.findElement(BTN_ACTION_C).click();
+    public void tapP2k() {
+        driver.findElement(BTN_P2K).click();
     }
 
     public String getToolbarStatus() {

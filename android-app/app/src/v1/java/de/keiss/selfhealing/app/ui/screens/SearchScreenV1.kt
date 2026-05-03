@@ -34,9 +34,9 @@ import de.keiss.selfhealing.app.ui.healableTestTag
  * - "text_no_results"    : "No results" message
  * - "leg_train_number"   : Train number of first leg (inline in card)
  * - "leg_platform"       : Platform of first leg (inline in card)
- * - "btn_action_a"       : First toolbar action — bound to filter behavior in v1 (labeled TextButton)
- * - "btn_action_b"       : Second toolbar action — bound to sort behavior in v1 (labeled TextButton)
- * - "btn_action_c"       : Third toolbar action — bound to share behavior in v1 (labeled TextButton)
+ * - "btn_m3n"            : First toolbar action — bound to filter behavior in v1 (labeled TextButton)
+ * - "btn_x7q"            : Second toolbar action — bound to sort behavior in v1 (labeled TextButton)
+ * - "btn_p2k"            : Third toolbar action — bound to share behavior in v1 (labeled TextButton)
  * - "toolbar_status"     : Status text after a toolbar action was triggered
  */
 @OptIn(ExperimentalMaterial3Api::class)
@@ -148,10 +148,10 @@ fun SearchScreenV1(
 
             // Results list
             if (connections.isNotEmpty()) {
-                // v1 toolbar: labeled buttons. testTags are intentionally semantic-free
-                // (`btn_action_a/b/c`) so the broken-locator name carries no hint about which
-                // action it targets — the LLM cannot infer position from the locator alone.
-                // The visible button labels stay descriptive ("Filtern" etc.) for the demo UX.
+                // v1 toolbar: labeled buttons. testTags are intentionally noise-suffixed
+                // (`btn_m3n/_x7q/_p2k`) — neither alphabetic nor positional ordering, so
+                // the broken-locator name carries no usable hint to the LLM. Visible button
+                // labels stay descriptive ("Filtern" etc.) for the demo UX.
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween
@@ -159,24 +159,24 @@ fun SearchScreenV1(
                     TextButton(
                         onClick = onFilter,
                         modifier = Modifier
-                            .healableTestTag("btn_action_a")
-                            .semantics { contentDescription = "Aktion A" }
+                            .healableTestTag("btn_m3n")
+                            .semantics { contentDescription = "Filtern" }
                     ) {
                         Text("Filtern")
                     }
                     TextButton(
                         onClick = onSort,
                         modifier = Modifier
-                            .healableTestTag("btn_action_b")
-                            .semantics { contentDescription = "Aktion B" }
+                            .healableTestTag("btn_x7q")
+                            .semantics { contentDescription = "Sortieren" }
                     ) {
                         Text("Sortieren")
                     }
                     TextButton(
                         onClick = onShare,
                         modifier = Modifier
-                            .healableTestTag("btn_action_c")
-                            .semantics { contentDescription = "Aktion C" }
+                            .healableTestTag("btn_p2k")
+                            .semantics { contentDescription = "Teilen" }
                     ) {
                         Text("Teilen")
                     }

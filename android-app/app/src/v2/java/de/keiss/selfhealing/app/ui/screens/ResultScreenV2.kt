@@ -40,9 +40,9 @@ import de.keiss.selfhealing.app.ui.healableTestTag
  * - Toolbar (Filter/Sort/Share) collapsed into icon-only IconButtons that all share
  *   the testTag "toolbar_action" and content-desc "Aktion" — only the rendered icon
  *   glyph distinguishes them. Vision-affine on purpose:
- *   - "btn_action_a" → first "toolbar_action"  (filter funnel icon)
- *   - "btn_action_b" → second "toolbar_action" (sort arrows icon)
- *   - "btn_action_c" → third "toolbar_action"  (share icon)
+ *   - "btn_m3n" → first "toolbar_action"  (filter funnel icon)
+ *   - "btn_x7q" → second "toolbar_action" (sort arrows icon)
+ *   - "btn_p2k" → third "toolbar_action"  (share icon)
  *   The status text "toolbar_status" is identical in v1/v2.
  */
 @OptIn(ExperimentalMaterial3Api::class)

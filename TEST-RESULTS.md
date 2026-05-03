@@ -154,7 +154,7 @@ Mit dem Feature [toolbar_actions.feature](integration-tests/src/test/resources/f
 
 **Befund:** Sonnet 4.6 trifft auch ohne Vision identisch — die Variable-Namen (`btn_filter`/`btn_sort`/`btn_share`) plus die UI-Konvention Filter→Sort→Share von links nach rechts geben einen so starken Prior, dass das Modell die Position auch ohne Bild korrekt rät. Track diskriminiert nicht.
 
-### Iteration 2 — semantisch entkoppelte Locator-Namen (`btn_action_a/b/c`)
+### Iteration 2 — semantisch entkoppelte aber alphabetische Locator-Namen (`btn_action_a/b/c`)
 
 Locatoren auf `btn_action_a/b/c` umbenannt, Page-Object-Methoden auf `tapActionA/B/C()`, Cucumber-Steps auf "ich auf Aktion A/B/C klicke". Sichtbare Button-Beschriftungen v1 bleiben "Filtern"/"Sortieren"/"Teilen" (für die App-UX), tragen aber keine Heal-relevante Information mehr.
 
@@ -176,15 +176,30 @@ Locatoren auf `btn_action_a/b/c` umbenannt, Page-Object-Methoden auf `tapActionA
 - **Devstral kollabiert auf 1/3** — wählt für jede der drei broken-Locators denselben Locator (`accessibilityId: Aktion`), der den ersten der drei identischen `toolbar_action`-Knoten findet. Aktion A passiert nur zufällig, weil Position 0 = Filter. B und C scheitern auf der `toolbar_status`-Assertion. Damit ist die Vision-Lücke für lokale/schwächere Modelle dokumentiert.
 - **Vergleich mit lokalem Vision-Modell steht aus** — Devstral selbst ist text-only. Für eine echte Vision-vs-Text-Lokal-Demo müsste ein Vision-fähiges lokales Modell geladen werden (z. B. Qwen3-VL).
 
-### Hypothese-Status
+### Iteration 3 — unalphabetisches Rauschen (`btn_m3n` / `btn_x7q` / `btn_p2k`)
 
-Die Vision-Hypothese hält **nicht** für starke Cloud-Modelle gegen die aktuelle Track-Schärfe — Sonnet löst auch ohne Bild. Sie hält **uneingeschränkt** für lokale Code-Modelle ohne breite UI-Priors: Devstral kann die drei identischen XML-Knoten nicht disambiguieren und wählt deterministisch das erste Element. Die gezielte Steigerung der Schwierigkeit (z. B. Reihenfolge in v2 randomisieren oder weiter entkoppelte Suffixe wie `btn_x7q/m3n/p2k`) könnte auch Sonnet brechen — Aufwand: ~10 min Code, ein weiterer Cloud-Run.
+Suffixe auf deterministisches Rauschen ohne alphabetische Sortier-Beziehung umbenannt: `m3n` (Filter, Position 0), `x7q` (Sort, Position 1), `p2k` (Share, Position 2). Damit ist auch der `_a/_b/_c → 0/1/2`-Hint der Iteration 2 entfernt. Page-Object-Methoden / Steps / Feature ziehen mit (`tapM3n` / "ich auf den Button m3n klicke" / "Button m3n löst Filter-Verhalten aus").
+
+| Profil | Tests | Toolbar-Heals | Gewählte Locatoren | ∅ Heal-Latenz | Gesamtdauer |
+|---|---|---|---|---|---|
+| `anthropic` (Text-only) | **9/9** | 3/3 Attempt 1 | `instance(0)` / `instance(1)` / `instance(2)` ✓ | 15.5 s | 13 min 50 s |
+| `local-devstral` (Text-only) | **7/9** | 1/3 — m3n korrekt, **x7q+p2k falsch** | alle drei → `accessibilityId: Aktion` ⇒ immer instance(0) = Filter | 119.6 s | 35 min 12 s |
+
+**Befund:**
+- **Sonnet bleibt 3/3.** Suffixe `m3n` / `x7q` / `p2k` haben keine alphabetische Position-Beziehung mehr (alphabetisch wäre `m3n < p2k < x7q`, layout-Position ist `m3n=0, x7q=1, p2k=2`). Dass Sonnet trotzdem korrekt mappt, deutet auf einen weiteren Leak: die **Deklarations-Reihenfolge der `BTN_*`-Konstanten in `ResultPage.java`** — der `SourceCodeResolver` lädt das Page-Object beim Heal mit, das Modell sieht die Liste in Layout-Reihenfolge und mappt declaration-index → instance-index. Um Sonnet auf dieser Strecke zu brechen, müsste man die Deklarations-Reihenfolge im Page-Object ebenfalls schütteln (z. B. p2k, m3n, x7q deklarieren) oder die v2-Layout-Reihenfolge gegenüber v1 randomisieren.
+- **Devstral kollabiert wieder auf 1/3.** Identisches Muster wie Iteration 2: alle drei broken-Locators mappen auf `accessibilityId: Aktion`, was deterministisch instance(0) = Filter trifft. m3n passt zufällig, x7q (erwartet "sortiert") und p2k (erwartet "geteilt") scheitern auf der `toolbar_status`-Assertion. Devstral ist gegen Locator-Kollisionen wehrlos — egal wie der Suffix heißt.
+
+### Hypothese-Status (final)
+
+Die Vision-Hypothese hält **nicht** für starke Cloud-Modelle (Sonnet 4.6) gegen die hier gebauten Track-Härtungsstufen — alphabetischer Suffix, semantischer Suffix und unalphabetisches Rauschen schlagen alle 3/3 durch, weil das Modell genug Hilfssignale (Variablenname, alphabetische Ordnung, Source-Code-Deklarations-Reihenfolge) findet. Sie hält **uneingeschränkt** für lokale Code-Modelle ohne breite UI-Priors: Devstral kann die drei identischen XML-Knoten in keiner Konfiguration disambiguieren — egal ob die Suffixe semantisch (`filter/sort/share`), alphabetisch (`a/b/c`) oder Rauschen (`m3n/x7q/p2k`) sind, der Heal kollabiert immer auf dieselbe `accessibilityId: Aktion` und damit auf instance(0).
+
+Damit ist der Track als **vision-affiner Lakmustest für lokale/schwächere Modelle** dokumentiert. Wer Sonnet ebenfalls brechen will, müsste den Source-Code-Leak schließen (z. B. `BTN_*`-Deklarations-Reihenfolge in `ResultPage.java` gegen die v2-Layout-Position permutieren).
 
 ```bash
-# Strecke ausführen
+# Strecke ausführen (alle drei Iterationen reproduzierbar über git checkout des Iteration-Commits)
 ./scripts/run-tests-podman.sh v2 anthropic-vision   # Sonnet mit Screenshot
 ./scripts/run-tests-podman.sh v2 anthropic          # Sonnet text-only (Baseline)
-./scripts/run-tests-podman.sh v2 local-devstral     # Devstral text-only (lokal, Vision-Lücke)
+./scripts/run-tests-podman.sh v2 local-devstral     # Devstral text-only (Vision-Lücke)
 ```
 
 ---

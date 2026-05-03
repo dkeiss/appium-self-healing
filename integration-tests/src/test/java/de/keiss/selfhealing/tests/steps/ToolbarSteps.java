@@ -12,19 +12,19 @@ public class ToolbarSteps {
 
     private final ResultPage resultPage;
 
-    @Wenn("ich auf Aktion A klicke")
-    public void clickActionA() {
-        resultPage.tapActionA();
+    @Wenn("ich auf den Button m3n klicke")
+    public void clickM3n() {
+        resultPage.tapM3n();
     }
 
-    @Wenn("ich auf Aktion B klicke")
-    public void clickActionB() {
-        resultPage.tapActionB();
+    @Wenn("ich auf den Button x7q klicke")
+    public void clickX7q() {
+        resultPage.tapX7q();
     }
 
-    @Wenn("ich auf Aktion C klicke")
-    public void clickActionC() {
-        resultPage.tapActionC();
+    @Wenn("ich auf den Button p2k klicke")
+    public void clickP2k() {
+        resultPage.tapP2k();
     }
 
     @Dann("zeigt der Toolbar-Status {string}")
