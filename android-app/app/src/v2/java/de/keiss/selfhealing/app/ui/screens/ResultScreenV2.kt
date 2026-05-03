@@ -5,6 +5,9 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.Sort
+import androidx.compose.material.icons.filled.FilterList
+import androidx.compose.material.icons.filled.Share
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -34,6 +37,13 @@ import de.keiss.selfhealing.app.ui.healableTestTag
  * - Bottom sheet for detail view (new)
  * - Different card layout (horizontal instead of stacked)
  * - Price badge instead of inline text
+ * - Toolbar (Filter/Sort/Share) collapsed into icon-only IconButtons that all share
+ *   the testTag "toolbar_action" and content-desc "Aktion" — only the rendered icon
+ *   glyph distinguishes them. Vision-affine on purpose:
+ *   - "btn_action_a" → first "toolbar_action"  (filter funnel icon)
+ *   - "btn_action_b" → second "toolbar_action" (sort arrows icon)
+ *   - "btn_action_c" → third "toolbar_action"  (share icon)
+ *   The status text "toolbar_status" is identical in v1/v2.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -41,7 +51,11 @@ fun ResultScreenV2(
     connections: List<Connection>,
     isLoading: Boolean,
     error: String?,
-    onBack: () -> Unit
+    onBack: () -> Unit,
+    toolbarStatus: String,
+    onFilter: () -> Unit,
+    onSort: () -> Unit,
+    onShare: () -> Unit
 ) {
     var selectedConnection by remember { mutableStateOf<Connection?>(null) }
     val sheetState = rememberModalBottomSheetState()
@@ -96,18 +110,67 @@ fun ResultScreenV2(
                 }
 
                 else -> {
-                    LazyColumn(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .healableTestTag("results_container")  // Was "connection_list" in v1
-                            .padding(16.dp),
-                        verticalArrangement = Arrangement.spacedBy(12.dp)
-                    ) {
-                        items(connections) { connection ->
-                            JourneyCard(
-                                connection = connection,
-                                onClick = { selectedConnection = connection }
+                    Column(modifier = Modifier.fillMaxSize()) {
+                        // v2 toolbar: three identical IconButtons — same testTag, same content-desc.
+                        // The only discriminator is the rendered icon glyph (FilterList / Sort / Share).
+                        // Text-only XML inspection cannot tell them apart; vision can.
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 16.dp, vertical = 4.dp),
+                            horizontalArrangement = Arrangement.End
+                        ) {
+                            IconButton(
+                                onClick = onFilter,
+                                modifier = Modifier
+                                    .healableTestTag("toolbar_action")
+                                    .semantics { contentDescription = "Aktion" }
+                            ) {
+                                Icon(Icons.Filled.FilterList, contentDescription = null)
+                            }
+                            IconButton(
+                                onClick = onSort,
+                                modifier = Modifier
+                                    .healableTestTag("toolbar_action")
+                                    .semantics { contentDescription = "Aktion" }
+                            ) {
+                                Icon(Icons.AutoMirrored.Filled.Sort, contentDescription = null)
+                            }
+                            IconButton(
+                                onClick = onShare,
+                                modifier = Modifier
+                                    .healableTestTag("toolbar_action")
+                                    .semantics { contentDescription = "Aktion" }
+                            ) {
+                                Icon(Icons.Filled.Share, contentDescription = null)
+                            }
+                        }
+
+                        if (toolbarStatus.isNotEmpty()) {
+                            Text(
+                                text = toolbarStatus,
+                                style = MaterialTheme.typography.bodyMedium,
+                                fontWeight = FontWeight.Medium,
+                                modifier = Modifier
+                                    .healableTestTag("toolbar_status")
+                                    .semantics { contentDescription = toolbarStatus }
+                                    .padding(horizontal = 16.dp, vertical = 4.dp)
                             )
+                        }
+
+                        LazyColumn(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .healableTestTag("results_container")  // Was "connection_list" in v1
+                                .padding(16.dp),
+                            verticalArrangement = Arrangement.spacedBy(12.dp)
+                        ) {
+                            items(connections) { connection ->
+                                JourneyCard(
+                                    connection = connection,
+                                    onClick = { selectedConnection = connection }
+                                )
+                            }
                         }
                     }
                 }

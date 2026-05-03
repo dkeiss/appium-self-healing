@@ -12,6 +12,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import de.keiss.selfhealing.app.data.Connection
 import de.keiss.selfhealing.app.ui.healableTestTag
@@ -33,6 +34,10 @@ import de.keiss.selfhealing.app.ui.healableTestTag
  * - "text_no_results"    : "No results" message
  * - "leg_train_number"   : Train number of first leg (inline in card)
  * - "leg_platform"       : Platform of first leg (inline in card)
+ * - "btn_action_a"       : First toolbar action — bound to filter behavior in v1 (labeled TextButton)
+ * - "btn_action_b"       : Second toolbar action — bound to sort behavior in v1 (labeled TextButton)
+ * - "btn_action_c"       : Third toolbar action — bound to share behavior in v1 (labeled TextButton)
+ * - "toolbar_status"     : Status text after a toolbar action was triggered
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -45,7 +50,11 @@ fun SearchScreenV1(
     connections: List<Connection>,
     isLoading: Boolean,
     error: String?,
-    hasSearched: Boolean
+    hasSearched: Boolean,
+    toolbarStatus: String,
+    onFilter: () -> Unit,
+    onSort: () -> Unit,
+    onShare: () -> Unit
 ) {
     Scaffold(
         topBar = {
@@ -139,6 +148,54 @@ fun SearchScreenV1(
 
             // Results list
             if (connections.isNotEmpty()) {
+                // v1 toolbar: labeled buttons. testTags are intentionally semantic-free
+                // (`btn_action_a/b/c`) so the broken-locator name carries no hint about which
+                // action it targets — the LLM cannot infer position from the locator alone.
+                // The visible button labels stay descriptive ("Filtern" etc.) for the demo UX.
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    TextButton(
+                        onClick = onFilter,
+                        modifier = Modifier
+                            .healableTestTag("btn_action_a")
+                            .semantics { contentDescription = "Aktion A" }
+                    ) {
+                        Text("Filtern")
+                    }
+                    TextButton(
+                        onClick = onSort,
+                        modifier = Modifier
+                            .healableTestTag("btn_action_b")
+                            .semantics { contentDescription = "Aktion B" }
+                    ) {
+                        Text("Sortieren")
+                    }
+                    TextButton(
+                        onClick = onShare,
+                        modifier = Modifier
+                            .healableTestTag("btn_action_c")
+                            .semantics { contentDescription = "Aktion C" }
+                    ) {
+                        Text("Teilen")
+                    }
+                }
+
+                if (toolbarStatus.isNotEmpty()) {
+                    Text(
+                        text = toolbarStatus,
+                        style = MaterialTheme.typography.bodyMedium,
+                        fontWeight = FontWeight.Medium,
+                        modifier = Modifier
+                            .healableTestTag("toolbar_status")
+                            .semantics { contentDescription = toolbarStatus }
+                            .padding(vertical = 4.dp)
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(8.dp))
+
                 LazyColumn(
                     modifier = Modifier.healableTestTag("connection_list"),
                     verticalArrangement = Arrangement.spacedBy(8.dp)

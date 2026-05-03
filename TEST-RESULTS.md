@@ -13,6 +13,7 @@
   - [GLM-4.7-Flash](#glm-47-flash)
 - [LLM-Vergleich (Cloud + lokal)](#llm-vergleich-cloud--lokal)
 - [Cache-Bypass für LLM-Benchmarks](#cache-bypass-für-llm-benchmarks)
+- [Vision-affiner Toolbar-Track](#vision-affiner-toolbar-track)
 - [verify-fix.sh Validierung](#verify-fixsh-validierung)
 
 ---
@@ -137,6 +138,54 @@ self-healing:
 ## Cache-Bypass für LLM-Benchmarks
 
 Per ENV `SELF_HEALING_CACHE_ENABLED=false` lässt sich der `PromptCache` deaktivieren — nützlich für faire Einzel-Locator-Benchmarks, bei denen ein falscher Heal in Szenario 1 nicht via Cache in Folge-Szenarien propagieren soll. Default bleibt `true`.
+
+---
+
+## Vision-affiner Toolbar-Track
+
+Mit dem Feature [toolbar_actions.feature](integration-tests/src/test/resources/features/toolbar_actions.feature) (Tag `@toolbar`) gibt es eine eigene Strecke, die XML-only-Heal eigentlich aushebeln soll: Die drei Toolbar-Aktionen (Filtern / Sortieren / Teilen) teilen sich in v2 denselben `testTag` (`toolbar_action`) und dieselbe `content-description` (`Aktion`). Nur das gerenderte Icon-Glyph unterscheidet sie. Verifikation läuft über `toolbar_status` — ein falscher Heal kippt auf der Assertion, nicht auf `NoSuchElementException`.
+
+### Iteration 1 — semantische Locator-Namen (`btn_filter`/`btn_sort`/`btn_share`)
+
+| Profil | Tests | Toolbar-Heals | Gewählte Locatoren | ∅ Heal-Latenz | Gesamtdauer |
+|---|---|---|---|---|---|
+| `anthropic-vision` (Vision) | **9/9** | 3/3 Attempt 1 | `instance(0)` / `instance(1)` / `instance(2)` ✓ | 21.4 s | 15 min 11 s |
+| `anthropic` (Text-only) | **9/9** | 3/3 Attempt 1 | `instance(0)` / `instance(1)` / `instance(2)` ✓ | 16.3 s | 13 min 48 s |
+
+**Befund:** Sonnet 4.6 trifft auch ohne Vision identisch — die Variable-Namen (`btn_filter`/`btn_sort`/`btn_share`) plus die UI-Konvention Filter→Sort→Share von links nach rechts geben einen so starken Prior, dass das Modell die Position auch ohne Bild korrekt rät. Track diskriminiert nicht.
+
+### Iteration 2 — semantisch entkoppelte Locator-Namen (`btn_action_a/b/c`)
+
+Locatoren auf `btn_action_a/b/c` umbenannt, Page-Object-Methoden auf `tapActionA/B/C()`, Cucumber-Steps auf "ich auf Aktion A/B/C klicke". Sichtbare Button-Beschriftungen v1 bleiben "Filtern"/"Sortieren"/"Teilen" (für die App-UX), tragen aber keine Heal-relevante Information mehr.
+
+| Profil | Tests | Toolbar-Heals | Gewählte Locatoren | ∅ Heal-Latenz | Gesamtdauer |
+|---|---|---|---|---|---|
+| `anthropic` (Text-only) | **9/9** | 3/3 Attempt 1 | `instance(0)` / `instance(1)` / `instance(2)` ✓ | 16.1 s | 13 min 54 s |
+| `local-devstral` (Text-only) | **7/9** | 1/3 — A korrekt, **B+C falsch** | alle drei → `accessibilityId: Aktion` ⇒ immer instance(0) = Filter | 119.2 s | 35 min 21 s |
+
+**Devstral-Detail:**
+
+| Locator | Heal | Resultat | Erwarteter Status | Gemessen |
+|---|---|---|---|---|
+| `btn_action_a` | `accessibilityId: Aktion` | klickt instance(0) | "Verbindungen gefiltert" | "Verbindungen gefiltert" ✓ |
+| `btn_action_b` | `accessibilityId: Aktion` | klickt instance(0) | "Verbindungen sortiert" | "Verbindungen gefiltert" ✗ |
+| `btn_action_c` | `accessibilityId: Aktion` | klickt instance(0) | "Verbindungen geteilt" | "Verbindungen gefiltert" ✗ |
+
+**Befund:**
+- **Sonnet bleibt 3/3** — der alphabetische Suffix `_a/_b/_c` plus Layout-Reihenfolge im XML reicht ihm immer noch, um die Position korrekt zu rekonstruieren.
+- **Devstral kollabiert auf 1/3** — wählt für jede der drei broken-Locators denselben Locator (`accessibilityId: Aktion`), der den ersten der drei identischen `toolbar_action`-Knoten findet. Aktion A passiert nur zufällig, weil Position 0 = Filter. B und C scheitern auf der `toolbar_status`-Assertion. Damit ist die Vision-Lücke für lokale/schwächere Modelle dokumentiert.
+- **Vergleich mit lokalem Vision-Modell steht aus** — Devstral selbst ist text-only. Für eine echte Vision-vs-Text-Lokal-Demo müsste ein Vision-fähiges lokales Modell geladen werden (z. B. Qwen3-VL).
+
+### Hypothese-Status
+
+Die Vision-Hypothese hält **nicht** für starke Cloud-Modelle gegen die aktuelle Track-Schärfe — Sonnet löst auch ohne Bild. Sie hält **uneingeschränkt** für lokale Code-Modelle ohne breite UI-Priors: Devstral kann die drei identischen XML-Knoten nicht disambiguieren und wählt deterministisch das erste Element. Die gezielte Steigerung der Schwierigkeit (z. B. Reihenfolge in v2 randomisieren oder weiter entkoppelte Suffixe wie `btn_x7q/m3n/p2k`) könnte auch Sonnet brechen — Aufwand: ~10 min Code, ein weiterer Cloud-Run.
+
+```bash
+# Strecke ausführen
+./scripts/run-tests-podman.sh v2 anthropic-vision   # Sonnet mit Screenshot
+./scripts/run-tests-podman.sh v2 anthropic          # Sonnet text-only (Baseline)
+./scripts/run-tests-podman.sh v2 local-devstral     # Devstral text-only (lokal, Vision-Lücke)
+```
 
 ---
 

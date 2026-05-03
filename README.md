@@ -97,6 +97,12 @@ v1 ist eine Einzelseiten-App mit Standard-IDs; v2 hat einen separaten Ergebnis-S
 | Keine Ergebnisse | `text_no_results` | `empty_state_text` | ID + separate Seite | Schwer |
 | Tauschen-Button | — | `btn_swap` | Neu in v2 | — |
 | Detail-Sheet | — | `detail_sheet` | Neu in v2 | — |
+| Aktion A (Filter) | `btn_action_a` (TextButton) | `toolbar_action` (IconButton, Trichter-Icon) | ID + Widget-Typ + ID-Kollision | **Vision-affin** |
+| Aktion B (Sort) | `btn_action_b` (TextButton) | `toolbar_action` (IconButton, Sortier-Icon) | ID + Widget-Typ + ID-Kollision | **Vision-affin** |
+| Aktion C (Share) | `btn_action_c` (TextButton) | `toolbar_action` (IconButton, Share-Icon) | ID + Widget-Typ + ID-Kollision | **Vision-affin** |
+| Toolbar-Status | `toolbar_status` | `toolbar_status` | unverändert (Verifikations-Anker) | — |
+
+> **Vision-affine Locator-Kollision:** Die drei Toolbar-Aktionen in v2 teilen sich denselben `testTag` (`toolbar_action`) und dieselbe `content-description` (`Aktion`). Im XML-Page-Source sind sie ununterscheidbar — der einzige Diskriminator ist das gerenderte Icon-Glyph (Trichter / Sortier-Pfeile / Share-Symbol). Die v1-Locatoren heißen bewusst `btn_action_a/b/c` (semantisch entkoppelt), damit der broken-Locator-Name dem LLM keinen Hinweis auf Position oder Zweck gibt — ohne diesen Schritt ratet ein starkes Cloud-Modell die Reihenfolge aus dem Variablennamen + UI-Konvention korrekt. Verifikation läuft über den `toolbar_status`-Text, der nach erfolgreichem Klick zeigt, welche Aktion tatsächlich ausgelöst wurde — ein falscher Heal schlägt damit auf der Assertion fehl, nicht erst bei `NoSuchElementException`.
 
 ---
 
